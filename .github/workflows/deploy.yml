@@ -4,7 +4,7 @@ name: Deploy DeamV Web to DigitalOcean
 on:
   push:
     branches:
-      - dev
+      - master
 
 jobs:
   deploy:
