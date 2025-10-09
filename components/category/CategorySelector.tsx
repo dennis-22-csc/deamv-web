@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { SelectOption } from '@/components/ui/Select';
-import { getAllCategories, hasDataScienceChallenges, getDataScienceChallengesByCategory } from '@/lib/database';
+import { practiceDatabase } from '@/lib/database';
 
 interface CategorySelectorProps {
   selectedCategory: string;
@@ -44,8 +44,8 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
       setIsLoading(true);
       
       const [allCategories, hasQuestions] = await Promise.all([
-        getAllCategories(),
-        hasDataScienceChallenges(),
+        practiceDatabase.getAllCategories(),
+        practiceDatabase.hasDataScienceChallenges(),
       ]);
 
       // Create category options with "General" first
@@ -60,7 +60,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
 
       // Load stats for the selected category
       if (hasQuestions) {
-        const challenges = await getDataScienceChallengesByCategory(selectedCategory);
+        const challenges = await practiceDatabase.getDataScienceChallengesByCategory(selectedCategory);
         const uniqueCategories = ['General', ...allCategories];
         
         setStats({
@@ -88,7 +88,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
     // Update stats for the new category
     if (stats.hasQuestions) {
       try {
-        const challenges = await getDataScienceChallengesByCategory(newCategory);
+        const challenges = await practiceDatabase.getDataScienceChallengesByCategory(newCategory);
         setStats(prev => ({
           ...prev,
           totalChallenges: challenges.length,
@@ -366,7 +366,7 @@ const CompactCategorySelector: React.FC<CompactCategorySelectorProps> = ({
 
   const loadCategories = async () => {
     try {
-      const allCategories = await getAllCategories();
+      const allCategories = await practiceDatabase.getAllCategories();
       const categoryOptions: SelectOption[] = [
         { value: 'General', label: 'General' },
         ...allCategories
