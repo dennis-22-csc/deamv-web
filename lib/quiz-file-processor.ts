@@ -57,7 +57,7 @@ class QuizFileProcessor {
 
   
   private getCurrentQuizNumberFromEnv(): 1 | 2 | 3 | 4 {
-   const envQuizNumber = process.env.NEXT_PUBLIC_QUIZ_NUMBER;
+   const envQuizNumber = process.env.NEXT_PUBLIC_QUIZ_NUMBER || '1';
 
     if (!envQuizNumber) {
         throw new Error('❌ [QuizFileProcessor] Required environment variable NEXT_PUBLIC_QUIZ_NUMBER is not set. Cannot determine quiz to load.');
