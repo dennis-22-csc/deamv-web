@@ -1,9 +1,10 @@
+// components/practice/ControlButtons.tsx
 import React from 'react';
-import { 
-	Play, 
-	ArrowRight, 
-	Eye, 
-	EyeOff, 
+import {
+	Play,
+	ArrowRight,
+	Eye,
+	EyeOff,
 	RotateCcw,
 	SkipForward,
 	CheckCircle2,
@@ -21,7 +22,7 @@ interface ControlButtonsProps {
 	onTryAgain?: () => void;
 	onSkip?: () => void;
 	onShowAnswer?: () => void;
-	
+
 	// Visibility states
 	showSubmit?: boolean;
 	showNext?: boolean;
@@ -29,14 +30,14 @@ interface ControlButtonsProps {
 	showTryAgain?: boolean;
 	showSkip?: boolean;
 	showShowAnswer?: boolean;
-	
+
 	// Button states
 	isEvaluating?: boolean;
 	isSubmitting?: boolean;
-	isCorrect?: boolean | null; // Changed to allow null for initial state
+	isCorrect?: boolean | null; // Correctly defined here
 	isShowingAnswer?: boolean;
 	canSubmit?: boolean;
-	
+
 	// Text customization
 	submitText?: string;
 	nextText?: string;
@@ -44,7 +45,7 @@ interface ControlButtonsProps {
 	tryAgainText?: string;
 	skipText?: string;
 	showAnswerText?: string;
-	
+
 	// Layout
 	layout?: 'horizontal' | 'vertical' | 'auto';
 	className?: string;
@@ -59,7 +60,7 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 	onTryAgain,
 	onSkip,
 	onShowAnswer,
-	
+
 	// Visibility states
 	showSubmit = true,
 	showNext = false,
@@ -67,14 +68,14 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 	showTryAgain = false,
 	showSkip = false,
 	showShowAnswer = false,
-	
+
 	// Button states
 	isEvaluating = false,
 	isSubmitting = false,
 	isCorrect = null, // Set default to null
 	isShowingAnswer = false,
 	canSubmit = true,
-	
+
 	// Text customization
 	submitText = 'Submit Code',
 	nextText = 'Next Challenge',
@@ -82,7 +83,7 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 	tryAgainText = 'Try Again',
 	skipText = 'Skip Challenge',
 	showAnswerText = 'Show Answer',
-	
+
 	// Layout
 	layout = 'horizontal',
 	className = '',
@@ -93,13 +94,13 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 	// Determine the effective submit button text and icon
 	let actualSubmitText = submitText;
 	let submitIcon = Play;
-	
-	if (isCorrect === true) {
+
+	if (isCorrect) {
 		actualSubmitText = 'Correct!';
 		submitIcon = CheckCircle2;
 	} else if (isCorrect === false && submitText === 'Submit Code') {
 		// When incorrect, change the default 'Submit Code' text to 'Resubmit' or 'Try Again'
-		actualSubmitText = 'Resubmit';	
+		actualSubmitText = 'Resubmit';
 		submitIcon = RotateCcw;
 	}
 
@@ -112,9 +113,10 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 		if (showSubmit && onSubmit) {
 			buttons.push({
 				key: 'submit',
-				variant: isCorrect === true ? 'success' as const : 'primary' as const,
+				variant: isCorrect ? 'success' as const : 'primary' as const,
 				onClick: onSubmit,
-				disabled: !canSubmit || isSubmitting || isEvaluating || isCorrect === true,
+				// FIX: Use 'isCorrect ?? false' to ensure the final disabled value is boolean | undefined
+				disabled: !canSubmit || isSubmitting || isEvaluating || (isCorrect ?? false),
 				loading: isSubmitting || isEvaluating, // Use isSubmitting/isEvaluating for loading
 				icon: submitIcon,
 				text: actualSubmitText,
@@ -128,19 +130,21 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 				key: 'next',
 				variant: 'success' as const, // Primary color for flow control
 				onClick: onNext,
+				// disabled is always boolean or undefined here
 				disabled: isSubmitting || isEvaluating,
 				icon: ArrowRight,
 				text: nextText,
 				order: 6,
 			});
 		}
-		
+
 		// Show Answer Button - When stuck (Secondary action)
 		if (showShowAnswer && onShowAnswer) {
 			buttons.push({
 				key: 'show-answer',
 				variant: 'outline' as const,
 				onClick: onShowAnswer,
+				// disabled is always boolean or undefined here
 				disabled: isSubmitting || isEvaluating,
 				icon: HelpCircle,
 				text: showAnswerText,
@@ -154,6 +158,7 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 				key: 'hide-answer',
 				variant: 'outline' as const,
 				onClick: onHideAnswer,
+				// disabled is always boolean or undefined here
 				disabled: isSubmitting || isEvaluating,
 				icon: EyeOff,
 				text: hideAnswerText,
@@ -167,6 +172,7 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 				key: 'skip',
 				variant: 'ghost' as const,
 				onClick: onSkip,
+				// disabled is always boolean or undefined here
 				disabled: isSubmitting || isEvaluating,
 				icon: SkipForward,
 				text: skipText,
@@ -190,12 +196,12 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 	`;
 
 	const buttonClasses = fullWidth && isVertical ? 'w-full' : '';
-	
+
 	// Custom rendering for horizontal/auto layout to keep primary actions on the right
 	if (!isVertical) {
 		const primaryActions = visibleButtons.filter(b => b.key === 'submit' || b.key === 'next');
 		const secondaryActions = visibleButtons.filter(b => b.key !== 'submit' && b.key !== 'next');
-		
+
 		return (
 			<Card className="p-4">
 				<div className={`flex justify-between items-center ${fullWidth ? 'w-full' : ''} ${className}`}>
@@ -206,7 +212,8 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 								key={button.key}
 								variant={button.variant}
 								onClick={button.onClick}
-								disabled={button.disabled}
+								// FIX: Apply non-nullish coalescing here (button.disabled is type boolean | null | undefined)
+								disabled={button.disabled ?? false}
 								loading={button.loading}
 								className="flex items-center gap-2"
 								size="lg"
@@ -216,7 +223,7 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 							</Button>
 						))}
 					</div>
-					
+
 					{/* Primary Actions (Right) - Only submit OR next should be here */}
 					<div className="flex gap-3">
 						{primaryActions.map((button) => (
@@ -224,7 +231,8 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 								key={button.key}
 								variant={button.variant}
 								onClick={button.onClick}
-								disabled={button.disabled}
+								// FIX: Apply non-nullish coalescing here (button.disabled is type boolean | null | undefined)
+								disabled={button.disabled ?? false}
 								loading={button.loading}
 								className={`flex items-center gap-2 ${buttonClasses}`}
 								size="lg"
@@ -248,7 +256,8 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 						key={button.key}
 						variant={button.variant}
 						onClick={button.onClick}
-						disabled={button.disabled}
+						// FIX: Apply non-nullish coalescing here (button.disabled is type boolean | null | undefined)
+						disabled={button.disabled ?? false}
 						loading={button.loading}
 						className={`flex items-center gap-2 ${buttonClasses}`}
 						size="lg"
@@ -264,7 +273,7 @@ const ControlButtons: React.FC<ControlButtonsProps> = ({
 
 // Pre-configured button sets for common scenarios
 
-interface PracticeControlsProps extends Omit<ControlButtonsProps, 
+interface PracticeControlsProps extends Omit<ControlButtonsProps,
 	'showSubmit' | 'showNext' | 'showHideAnswer' | 'showTryAgain' | 'showSkip' | 'showShowAnswer' | 'isCorrect'
 > {
 	mode: 'initial' | 'evaluating' | 'correct' | 'incorrect' | 'showing-answer';
@@ -283,15 +292,15 @@ const PracticeControls: React.FC<PracticeControlsProps> = ({
 				// FIX: Only show Submit button initially
 				return {
 					showSubmit: true,
-					showShowAnswer: false, 
-					showSkip: false,      
+					showShowAnswer: false,
+					showSkip: false,
 					showNext: false,
 					showHideAnswer: false,
 				};
-			
+
 			case 'evaluating':
 				return {
-					showSubmit: true, 
+					showSubmit: true,
 					showShowAnswer: false,
 					showSkip: false,
 					showNext: false,
@@ -299,17 +308,17 @@ const PracticeControls: React.FC<PracticeControlsProps> = ({
 					isEvaluating: true,
 					submitText: 'Evaluating...',
 				};
-			
+
 			case 'correct':
 				return {
-					showSubmit: true, 
+					showSubmit: true,
 					showShowAnswer: false,
 					showSkip: false,
-					showNext: true, 
+					showNext: true,
 					showHideAnswer: false,
 					isCorrect: true,
 				};
-			
+
 			case 'incorrect':
 				// FIX: Show all retry/help options when the user is incorrect
 				return {
@@ -318,9 +327,9 @@ const PracticeControls: React.FC<PracticeControlsProps> = ({
 					showSkip: true, // Allow user to skip
 					showNext: false,
 					showHideAnswer: false,
-					isCorrect: false, 
+					isCorrect: false,
 				};
-			
+
 			case 'showing-answer':
 				// FIX: Hide all submission and navigation buttons, only show Hide Answer.
 				return {
@@ -330,7 +339,7 @@ const PracticeControls: React.FC<PracticeControlsProps> = ({
 					showNext: false,
 					showHideAnswer: true, // Only show Hide Answer
 				};
-			
+
 			default:
 				// Default should match initial state
 				return {
@@ -364,14 +373,16 @@ const CompactControls: React.FC<CompactControlsProps> = ({
 	primaryActionOnly = false,
 	...props
 }) => {
+	const { showNext, showSubmit, showHideAnswer, isCorrect } = props;
+
 	if (primaryActionOnly) {
 		// Show only the most important button
-		const { showNext, showSubmit, showHideAnswer, isCorrect } = props;
-		
+
 		// Logic to determine primary action
 		const nextIsPrimary = showNext && props.onNext;
 		const hideIsPrimary = showHideAnswer && props.onHideAnswer;
-		const submitIsPrimary = showSubmit && props.onSubmit && !isCorrect;
+		// A submit button is primary if it's shown AND we are NOT in the correct state
+		const submitIsPrimary = showSubmit && props.onSubmit && isCorrect !== true;
 
 		if (nextIsPrimary) {
 			return (
@@ -387,21 +398,23 @@ const CompactControls: React.FC<CompactControlsProps> = ({
 				</Button>
 			);
 		}
-		
+
 		if (submitIsPrimary) {
 			// Reuse the logic from ControlButtons for dynamic submit text
 			let actualSubmitText = props.submitText || 'Submit Code';
-			if (isCorrect === true) {
+
+			if (isCorrect) {
 				actualSubmitText = 'Correct!';
-			} else if (actualSubmitText === 'Submit Code') {
-				actualSubmitText = 'Resubmit';	
+			} else if (isCorrect === false && actualSubmitText === 'Submit Code') {
+				actualSubmitText = 'Resubmit';
 			}
 
+			// FIX: Use 'isCorrect ?? false' to ensure the disabled prop is boolean | undefined
 			return (
 				<Button
-					variant={props.isCorrect === true ? 'success' : 'primary'}
+					variant={isCorrect ? 'success' : 'primary'}
 					onClick={props.onSubmit}
-					disabled={!props.canSubmit || props.isSubmitting || props.isEvaluating}
+					disabled={!props.canSubmit || props.isSubmitting || props.isEvaluating || (isCorrect ?? false)}
 					loading={props.isSubmitting || props.isEvaluating}
 					className="flex items-center gap-2 w-full"
 					size="lg"
@@ -411,7 +424,7 @@ const CompactControls: React.FC<CompactControlsProps> = ({
 				</Button>
 			);
 		}
-		
+
 		if (hideIsPrimary) {
 			return (
 				<Button
@@ -485,12 +498,13 @@ const QuickActions: React.FC<QuickActionsProps> = ({
 	isCorrect = null,
 }) => {
 	let submitText = 'Submit';
-	if (isCorrect === true) {
+
+	if (isCorrect) { // Changed 'isCorrect === true' to 'isCorrect'
 		submitText = 'Correct!';
 	} else if (isCorrect === false) {
 		submitText = 'Resubmit';
 	}
-	
+
 	return (
 		<div className={`flex gap-2 ${className}`}>
 			<Button
@@ -503,7 +517,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({
 				<HelpCircle className="h-3 w-3" />
 				Show Answer
 			</Button>
-			
+
 			<Button
 				variant="outline"
 				size="sm"
@@ -514,17 +528,18 @@ const QuickActions: React.FC<QuickActionsProps> = ({
 				<SkipForward className="h-3 w-3" />
 				Skip
 			</Button>
-			
+
 			{onSubmit && (
 				<Button
-					variant={isCorrect === true ? 'success' : 'primary'}
+					variant={isCorrect ? 'success' : 'primary'} // Changed 'isCorrect === true' to 'isCorrect'
 					size="sm"
 					onClick={onSubmit}
-					disabled={!canSubmit || isSubmitting || isCorrect === true}
+					// FIX: Use 'isCorrect ?? false' to ensure the disabled prop is boolean | undefined
+					disabled={!canSubmit || isSubmitting || (isCorrect ?? false)}
 					loading={isSubmitting}
 					className="flex items-center gap-1 ml-auto"
 				>
-					{(isCorrect === true) ? <CheckCircle2 className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+					{(isCorrect) ? <CheckCircle2 className="h-3 w-3" /> : <Play className="h-3 w-3" />} // Changed 'isCorrect === true' to 'isCorrect'
 					{submitText}
 				</Button>
 			)}

@@ -11,6 +11,7 @@ interface QuizSubmitDialogProps {
   onConfirm: () => void;
   answeredCount: number;
   totalQuestions: number;
+  quizNumber: 1 | 2 | 3 | 4; 
 }
 
 export const QuizSubmitDialog: React.FC<QuizSubmitDialogProps> = ({

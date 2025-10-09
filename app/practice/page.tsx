@@ -17,29 +17,29 @@ import { PracticeComplete } from '@/components/practice/PracticeComplete';
 
 // Libs/Database
 import { getApiKey } from '@/lib/storage';
-import { getDataScienceChallengesByCategory } from '@/lib/database';
+import { practiceDatabase } from '@/lib/database';
 import { DataScienceChallenge, ChallengeAttempt, PracticeDataPayload } from '@/lib/database';
 
 // Define the API endpoint for evaluation
 const EVALUATION_API_ENDPOINT = '/api/evaluate-answer';
 
 interface EvaluationRequest {
-    instruction: string;
-    userCode: string;
-    expectedSolution: string; 
-    language?: string;
-    context?: string;
-    apiKey?: string; 
+	instruction: string;
+	userCode: string;
+	expectedSolution: string;
+	language?: string;
+	context?: string;
+	apiKey?: string;
 }
 
 interface EvaluationResponse {
-    success: boolean;
-    feedback: string;
-    isCorrect: boolean;
-    score?: number;
-    suggestions?: string[];
-    errors?: string[];
-    confidence?: number;
+	success: boolean;
+	feedback: string;
+	isCorrect: boolean;
+	score?: number;
+	suggestions?: string[];
+	errors?: string[];
+	confidence?: number;
 }
 
 interface TrialAttempt {
@@ -131,7 +131,7 @@ export default function PracticePage() {
 
 	const loadChallenges = useCallback(async () => {
 		try {
-			const challenges = await getDataScienceChallengesByCategory(category);
+			const challenges = await practiceDatabase.getDataScienceChallengesByCategory(category);
 
 			if (challenges.length === 0) {
 				setState(prev => ({
@@ -365,6 +365,7 @@ export default function PracticePage() {
 
 		const timeSpentSeconds = Math.round((Date.now() - currentAttempt.startTime) / 1000);
 
+		// FIX: Add the required 'timestamp' property.
 		const finalAttempt: ChallengeAttempt = {
 			challengeId: currentChallenge.id,
 			isCorrect: state.isCorrect === true, // The final result for this challenge
@@ -374,6 +375,7 @@ export default function PracticePage() {
 			showAnswerClicked: currentAttempt.showAnswerClicked,
 			timeSpentSeconds,
 			incorrectAttempts: currentAttempt.incorrectAttempts,
+			timestamp: new Date(), // <-- The missing required property
 		};
 
 		setState(prev => ({

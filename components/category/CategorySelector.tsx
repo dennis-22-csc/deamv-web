@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Upload, Database, Filter, CheckCircle2 } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
-import Select from '@/components/ui/Select';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
 import { SelectOption } from '@/components/ui/Select';
 import { getAllCategories, hasDataScienceChallenges, getDataScienceChallengesByCategory } from '@/lib/database';
 

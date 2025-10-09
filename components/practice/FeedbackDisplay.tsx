@@ -1,3 +1,4 @@
+// components/practice/FeedbackDisplay.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle, 
@@ -17,6 +18,18 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CodeDisplay } from './CodeDisplay';
 
+
+export const parseFeedback = (text: string, defaultVerdict?: 'CORRECT' | 'INCORRECT' | 'PARTIAL') => {
+  const verdictMatch = text.match(/VERDICT:\s*(CORRECT|INCORRECT|PARTIAL)/i);
+  const cleanText = text.replace(/VERDICT:\s*(CORRECT|INCORRECT|PARTIAL)/i, '').trim();
+  
+  return {
+    verdict: verdictMatch ? verdictMatch[1].toUpperCase() as 'CORRECT' | 'INCORRECT' | 'PARTIAL' : defaultVerdict,
+    text: cleanText,
+  };
+};
+
+
 interface FeedbackDisplayProps {
   feedback: string;
   type?: 'success' | 'error' | 'warning' | 'info' | 'evaluation';
@@ -31,6 +44,7 @@ interface FeedbackDisplayProps {
   onToggleTTS?: () => void;
   isTtsEnabled?: boolean;
 }
+
 
 const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({
   feedback,
@@ -50,18 +64,8 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({
   const [userRating, setUserRating] = useState<'helpful' | 'not-helpful' | null>(null);
   const [showFullFeedback, setShowFullFeedback] = useState(false);
 
-  // Parse feedback to extract verdict and clean text
-  const parseFeedback = (text: string) => {
-    const verdictMatch = text.match(/VERDICT:\s*(CORRECT|INCORRECT|PARTIAL)/i);
-    const cleanText = text.replace(/VERDICT:\s*(CORRECT|INCORRECT|PARTIAL)/i, '').trim();
-    
-    return {
-      verdict: verdictMatch ? verdictMatch[1].toUpperCase() as 'CORRECT' | 'INCORRECT' | 'PARTIAL' : verdict,
-      text: cleanText,
-    };
-  };
-
-  const { verdict: parsedVerdict, text: cleanFeedback } = parseFeedback(feedback);
+  // Use the globally defined parseFeedback
+  const { verdict: parsedVerdict, text: cleanFeedback } = parseFeedback(feedback, verdict);
   const finalVerdict = verdict || parsedVerdict;
 
   // Determine feedback type based on verdict
@@ -398,7 +402,8 @@ const CompactFeedback: React.FC<CompactFeedbackProps> = ({
   verdict,
   className = '',
 }) => {
-  const { text: cleanFeedback } = parseFeedback(feedback);
+  // Now correctly using the globally defined parseFeedback
+  const { text: cleanFeedback } = parseFeedback(feedback, verdict);
 
   const getVerdictColor = () => {
     switch (verdict) {

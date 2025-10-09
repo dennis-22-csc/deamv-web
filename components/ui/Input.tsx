@@ -3,7 +3,7 @@ import { LucideIcon } from 'lucide-react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   variant?: 'default' | 'outlined' | 'filled';
-  size?: 'sm' | 'md' | 'lg';
+  inputSize?: 'sm' | 'md' | 'lg';
   label?: string;
   error?: string;
   helperText?: string;
@@ -15,7 +15,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ 
     variant = 'outlined',
-    size = 'md',
+    inputSize = 'md',
     label,
     error,
     helperText,
@@ -26,6 +26,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     id,
     ...props 
   }, ref) => {
+    const size = inputSize;
+
     const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
     
     const baseStyles = 'transition-all duration-200 outline-none rounded-lg font-normal focus:ring-2';
@@ -60,11 +62,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       }
     };
 
-    // Determine padding based on icons
     let paddingStyle = sizeStyles[size];
-    // NOTE: The `split(' ')[1]` logic relies on a space existing after the px-* class,
-    // which is fragile. For simplicity, I'm keeping the original logic, but 
-    // real-world code should use a utility like `clsx` or `tw-merge`.
     if (StartIcon && EndIcon) {
       paddingStyle = `${iconPaddingStyles[size].both} ${sizeStyles[size].split(' ')[1]}`;
     } else if (StartIcon) {
@@ -113,15 +111,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       
       // If it's a React node (JSX element)
       if (React.isValidElement(icon)) {
-        // FIX: The original code returned the ternary operator result, 
-        // which caused the bug when a node was passed. We must return the 
-        // result of React.cloneElement or the original icon.
-        return React.cloneElement(icon, {
-          className: `${icon.props.className || ''} ${iconSizes[size]} ${iconColors}`
-        } as any);
+        // Assert the type of the element to allow access to props.className
+        const iconElement = icon as React.ReactElement<{ className?: string }>;
+
+        return React.cloneElement(iconElement, {
+          className: `${iconElement.props.className || ''} ${iconSizes[size]} ${iconColors}`
+        });
       }
 
-      // If it's some other valid ReactNode (like a string or number, though unlikely for an icon)
+      // If it's some other valid ReactNode
       return icon;
     };
 

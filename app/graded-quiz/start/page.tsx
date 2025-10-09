@@ -22,7 +22,7 @@ interface QuizData {
 }
 
 const TIME_LIMIT_MINUTES = parseInt(
-  process.env.NEXT_PUBLIC_QUIZ_TIME_LIMIT,
+  process.env.NEXT_PUBLIC_QUIZ_TIME_LIMIT ?? '60',
   10
 );
 // Calculate time limit in milliseconds

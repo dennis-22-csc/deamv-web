@@ -207,7 +207,7 @@ class QuizFileProcessor {
       const results = Papa.parse(csvContent, {
         header: true,
         skipEmptyLines: true,
-        transformHeader: (header) => {
+        transformHeader: (header: string) => {
           // Normalize header names
           const normalized = header.trim().toLowerCase();
           if (normalized.includes('question')) return 'Question';

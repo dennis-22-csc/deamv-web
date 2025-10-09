@@ -10,17 +10,12 @@ import {
   Eye,
   Trash2
 } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { ProgressDialog } from '@/components/dialogs/ProgressDialog';
 
-// --- NEW IMPORTS ---
-// Assuming fileProcessor is located in the same directory or a known path like '../utils/fileProcessor'
-import { quickProcessFile, FileProcessingResult as ProcessorResult } from '../utils/fileProcessor';
+import { quickProcessFile, FileProcessingResult as ProcessorResult } from '@/lib/fileProcessor';
 
-// NOTE: We keep the component's FileProcessingResult interface but align it to the processor's output.
-// The processor's interface is imported as ProcessorResult to avoid naming conflicts.
-// -------------------
 
 interface FileUploaderProps {
   onFileProcessed: (result: FileProcessingResult) => void;
@@ -31,7 +26,6 @@ interface FileUploaderProps {
   multiple?: boolean;
 }
 
-// Updated interface to match the structure expected by the FileUploader component (includes stats)
 export interface FileProcessingResult {
   success: boolean;
   message: string;
@@ -184,11 +178,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     setFiles([]);
   };
 
-  /**
-   * REPLACED: Calls the actual fileProcessor's quickProcessFile function.
-   * NOTE: We assume quickProcessFile handles all progress internally without callbacks,
-   * so we will use a small progress simulation for the UI.
-   */
   const processFile = async (fileInfo: FileInfo): Promise<FileProcessingResult> => {
     console.log(`🚀 [FileUploader] processFile started for: ${fileInfo.file.name}`);
 

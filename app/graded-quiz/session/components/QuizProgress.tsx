@@ -9,6 +9,7 @@ interface QuizProgressProps {
   currentIndex: number;
   answeredQuestions: number[];
   onQuestionSelect: (index: number) => void;
+  quizNumber: 1 | 2 | 3 | 4; 
 }
 
 export const QuizProgress: React.FC<QuizProgressProps> = ({

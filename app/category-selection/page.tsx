@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
 import { FileLoadDialog } from '@/components/dialogs/FileLoadDialog';
 import { ProgressDialog } from '@/components/dialogs/ProgressDialog';
-import { getAllCategories, hasDataScienceChallenges } from '@/lib/database';
+import { practiceDatabase } from '@/lib/database';
 import { processTxtFile } from '@/lib/fileProcessor';
 
 interface CategorySelectionState {
@@ -51,8 +51,8 @@ export default function CategorySelectionPage() {
   const loadInitialData = useCallback(async () => {
     try {
       const [hasQuestions, categories] = await Promise.all([
-        hasDataScienceChallenges(),
-        getAllCategories(),
+        practiceDatabase.hasDataScienceChallenges(),
+        practiceDatabase.getAllCategories(),
       ]);
 
       const allCategories = ['General', ...categories.filter(cat => cat !== 'General')];

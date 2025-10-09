@@ -69,6 +69,7 @@ export interface ChallengeAttempt {
   gotOnFirstTrial: boolean;
   showAnswerClicked: boolean; // Did the user click "Show Answer" or use the equivalent phrase?
   timeSpentSeconds: number; // Time spent on this specific challenge
+  timestamp: Date; // Added missing timestamp property
   incorrectAttempts: {
     code: string; // The code submitted for the incorrect trial
     feedback: string;
@@ -596,7 +597,6 @@ class PracticeDatabase {
       }
   }
 
-
   // ===== UTILITY METHODS (Existing logic retained) =====
 
   async hasDataScienceChallenges(): Promise<boolean> {
@@ -756,50 +756,6 @@ class PracticeDatabase {
   }
 }
 
+
 // Create and export a singleton instance
 export const practiceDatabase = new PracticeDatabase();
-
-// Helper function to bind a method to the instance
-const boundMethod = (methodName: keyof PracticeDatabase) => practiceDatabase[methodName].bind(practiceDatabase);
-
-// Convenience exports for common operations
-export const addDataScienceChallenge = boundMethod('addDataScienceChallenge');
-export const getDataScienceChallenges = boundMethod('getDataScienceChallenges');
-export const getDataScienceChallengesByCategory = boundMethod('getDataScienceChallengesByCategory');
-export const getChallengeById = boundMethod('getChallengeById');
-export const updateChallenge = boundMethod('updateChallenge');
-export const deleteChallenge = boundMethod('deleteChallenge');
-export const clearDataScienceChallenges = boundMethod('clearDataScienceChallenges');
-export const hasDataScienceChallenges = boundMethod('hasDataScienceChallenges');
-
-export const getAllCategories = boundMethod('getAllCategories');
-export const getChallengesByDifficulty = boundMethod('getChallengesByDifficulty');
-
-export const getUserProgress = boundMethod('getUserProgress');
-export const saveUserProgress = boundMethod('saveUserProgress');
-export const updateChallengeProgress = boundMethod('updateChallengeProgress');
-export const getCategoryProgress = boundMethod('getCategoryProgress');
-
-export const createPracticeSession = boundMethod('createPracticeSession');
-export const getPracticeSessions = boundMethod('getPracticeSessions');
-export const getSessionById = boundMethod('getSessionById');
-export const updateSessionProgress = boundMethod('updateSessionProgress');
-
-export const getAppSettings = boundMethod('getAppSettings');
-export const saveAppSettings = boundMethod('saveAppSettings');
-export const updateApiKey = boundMethod('updateApiKey');
-
-export const getChallengeCount = boundMethod('getChallengeCount');
-export const getRandomChallenges = boundMethod('getRandomChallenges');
-export const searchChallenges = boundMethod('searchChallenges');
-
-export const exportData = boundMethod('exportData');
-export const importData = boundMethod('importData');
-export const clearAllData = boundMethod('clearAllData');
-export const getDatabaseSize = boundMethod('getDatabaseSize');
-
-// NEW EXPORTS for Pending Uploads
-export const getPendingUploads = boundMethod('getPendingUploads');
-export const addPendingUpload = boundMethod('addPendingUpload');
-export const updatePendingUpload = boundMethod('updatePendingUpload');
-export const removePendingUpload = boundMethod('removePendingUpload');

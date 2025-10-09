@@ -9,6 +9,7 @@ interface QuizHeaderProps {
   registrationCode: string;
   totalQuestions: number;
   onSubmit: () => void;
+  quizNumber: 1 | 2 | 3 | 4; 
 }
 
 export const QuizHeader: React.FC<QuizHeaderProps> = ({
