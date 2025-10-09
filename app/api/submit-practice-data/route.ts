@@ -56,15 +56,12 @@ const safeToISOString = (dateValue: Date | string): string => {
             if (!isNaN(date.getTime())) {
                 return date.toISOString();
             } else {
-                console.warn('Invalid date string, using current time:', dateValue);
                 return new Date().toISOString();
             }
         } else {
-            console.warn('Unexpected date type, using current time:', typeof dateValue, dateValue);
             return new Date().toISOString();
         }
     } catch (error) {
-        console.error('Error converting date to ISO string:', error);
         return new Date().toISOString();
     }
 };
@@ -75,7 +72,6 @@ const sanitizePayload = (payload: any): PracticeDataPayload => {
         ...payload,
         startTime: safeToISOString(payload.startTime),
         endTime: safeToISOString(payload.endTime),
-        // Ensure other fields have fallbacks
         sessionId: payload.sessionId || `session-${Date.now()}`,
         registrationCode: payload.registrationCode || null,
         category: payload.category || 'Unknown',
@@ -92,22 +88,10 @@ export async function POST(request: Request) {
     const { searchParams } = new URL(request.url);
     const useSheet = searchParams.get('useSheet') === 'true';
 
-    console.log('🔧 Sheets Configuration Check:', {
-        SPREADSHEET_ID: SPREADSHEET_ID ? '✅ Set' : '❌ Missing',
-        SERVICE_ACCOUNT_EMAIL: SERVICE_ACCOUNT_EMAIL ? '✅ Set' : '❌ Missing',
-        PRIVATE_KEY: PRIVATE_KEY ? '✅ Set' : '❌ Missing',
-        auth: auth ? '✅ Created' : '❌ Failed',
-        useSheet
-    });
-
     try {
         const rawPayload = await request.json();
-        console.log('📦 Received raw payload:', rawPayload);
-
         // Sanitize the payload to handle date conversion safely
         const sanitizedPayload = sanitizePayload(rawPayload);
-        console.log('🧹 Sanitized payload:', sanitizedPayload);
-
         // Transform data to match sheet headers
         const rowData: SheetRowData = {
             sessionId: sanitizedPayload.sessionId,
@@ -123,10 +107,7 @@ export async function POST(request: Request) {
             attempts: JSON.stringify(sanitizedPayload.attempts), // Store as JSON string
         };
 
-        console.log('📝 Transformed row data:', rowData);
-
         if (!useSheet) {
-            console.log('📝 Practice data processed (Sheets disabled):', rowData);
             return NextResponse.json({ 
                 success: true, 
                 message: 'Data processed (Sheets disabled)',
@@ -136,7 +117,6 @@ export async function POST(request: Request) {
 
         // --- Validate Sheets Configuration ---
         if (!SPREADSHEET_ID || !auth) {
-            console.error('❌ Missing Google Sheets configuration');
             return NextResponse.json(
                 { 
                     error: 'Server not configured for Sheets logging',
@@ -146,25 +126,15 @@ export async function POST(request: Request) {
             );
         }
 
-        console.log('🔌 Connecting to Google Sheets...');
         const doc = new GoogleSpreadsheet(SPREADSHEET_ID, auth);
         
         await doc.loadInfo();
-        console.log('📊 Loaded document:', doc.title);
         
-        // List all available sheets
-        console.log('📑 Available sheets:');
-        Object.keys(doc.sheetsByTitle).forEach(title => {
-            console.log(`   - "${title}"`);
-        });
-
         const category = sanitizedPayload.category.trim();
-        console.log(`🔍 Looking for sheet: "${category}"`);
         
         const sheet = doc.sheetsByTitle[category];
         
         if (!sheet) {
-            console.error(`❌ Sheet "${category}" not found. Available sheets:`, Object.keys(doc.sheetsByTitle));
             return NextResponse.json(
                 { 
                     error: `Sheet "${category}" not found`,
@@ -174,31 +144,20 @@ export async function POST(request: Request) {
             );
         }
 
-        console.log(`✅ Found sheet: "${sheet.title}"`);
-        
         // Check sheet headers for debugging
         await sheet.loadHeaderRow();
-        console.log('📋 Sheet headers:', sheet.headerValues);
-        
-        console.log('📝 Adding row with data matching sheet headers...');
 
         try {
             // Add the row - this will match your sheet headers exactly
             const addedRow = await sheet.addRow(rowData);
-            
-            console.log(`✅ Successfully logged to "${category}":`, {
-                rowNumber: addedRow._rowNumber,
-                data: rowData
-            });
-            
+                        
             return NextResponse.json({
                 success: true,
                 message: `Data logged to "${category}" sheet`,
                 data: rowData,
-                rowNumber: addedRow._rowNumber
+                rowNumber: (addedRow as any).rowNumber || 'Unknown (Check Sheet)'
             });
         } catch (sheetError) {
-            console.error('❌ Error adding row to sheet:', sheetError);
             
             // Try to get more details about the sheet error
             try {
