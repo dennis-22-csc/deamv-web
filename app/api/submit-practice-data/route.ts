@@ -18,6 +18,7 @@ const auth = (SERVICE_ACCOUNT_EMAIL && PRIVATE_KEY) ? new JWT({
 }) : null;
 
 interface SheetRowData {
+    [key: string]: any; 
     sessionId: string;
     registrationCode: string | null;
     category: string;
@@ -30,7 +31,6 @@ interface SheetRowData {
     totalFirstTrialSuccess: number;
     attempts: string; 
 }
-
 interface PracticeDataPayload {
     sessionId: string;
     registrationCode: string | null;
