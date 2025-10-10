@@ -57,15 +57,6 @@ export const QuizHeader: React.FC<QuizHeaderProps> = ({
               {formatTime(timeRemaining)}
             </span>
           </div>
-
-          {/* Submit Button */}
-          <Button
-            onClick={onSubmit}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-          >
-            <Send className="h-4 w-4" />
-            Submit Quiz
-          </Button>
         </div>
 
         {/* Time Warning */}

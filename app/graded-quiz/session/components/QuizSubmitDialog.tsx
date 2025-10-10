@@ -24,7 +24,7 @@ export const QuizSubmitDialog: React.FC<QuizSubmitDialogProps> = ({
   const unansweredCount = totalQuestions - answeredCount;
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} size="md">
+    <Dialog isOpen={isOpen} onClose={onClose} size="md" showCancel={false}>
       <div className="text-center space-y-4">
         {/* Icon */}
         <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-yellow-100">

@@ -44,7 +44,7 @@ export const QuizConfirmationDialog: React.FC<QuizConfirmationDialogProps> = ({
 							</code>
 						</div>
 						<div className="text-xs text-gray-500">
-                            You are about to start **Quiz {quizNumber}**. This code cannot be changed once the quiz starts.
+                            You are about to start <strong>Quiz {quizNumber}</strong>. This code cannot be changed once the quiz starts.
 						</div>
 					</div>
 				</div>

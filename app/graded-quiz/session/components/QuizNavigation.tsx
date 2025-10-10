@@ -30,7 +30,6 @@ export const QuizNavigation: React.FC<QuizNavigationProps> = ({
         disabled={!hasPrevious}
         className="flex items-center gap-2"
       >
-        <ChevronLeft className="h-4 w-4" />
         Previous
       </Button>
 
@@ -49,7 +48,6 @@ export const QuizNavigation: React.FC<QuizNavigationProps> = ({
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
           >
             Next
-            <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (
           <Button
@@ -57,7 +55,6 @@ export const QuizNavigation: React.FC<QuizNavigationProps> = ({
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
           >
             Submit Quiz
-            <Send className="h-4 w-4" />
           </Button>
         )}
       </div>

@@ -72,8 +72,7 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
   const handleAutoSubmit = useCallback(() => {
     const finalSession = {
       ...sessionData,
-      endTime: Date.now(),
-      submitted: true,
+      endTime: Date.now()
     };
     onQuizComplete(finalSession);
   }, [sessionData, onQuizComplete]);
@@ -108,8 +107,7 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
   const confirmSubmit = () => {
     const finalSession = {
       ...sessionData,
-      endTime: Date.now(),
-      submitted: true,
+      endTime: Date.now()
     };
     onQuizComplete(finalSession);
     setShowSubmitDialog(false);

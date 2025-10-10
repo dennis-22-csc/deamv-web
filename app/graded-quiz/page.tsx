@@ -114,9 +114,6 @@ export default function GradedQuizPage() {
                 <Download className="h-8 w-8 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-gray-900">Loading Quiz Questions</h2>
-              <p className="text-gray-600 text-lg">
-                Preparing your graded assessment for Quiz {quizNumber}...
-              </p>
             </div>
 
             {/* Progress Section */}
@@ -209,11 +206,11 @@ export default function GradedQuizPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
                 <h4 className="font-semibold text-blue-800 mb-2">Quiz Information</h4>
                 <ul className="text-sm text-blue-700 space-y-1 text-left">
-                  <li>• You will need to enter your registration code before starting</li>
+                  <li>• You will need to enter a registration code before starting</li>
+                  <li>• Your registration code needs to be one given to you by one of our partner institutions</li>
                   <li>• You can skip questions and return to them later</li>
                   <li>• The quiz will auto-submit when time expires</li>
                   <li>• Your progress will be saved automatically</li>
-                  <li>• Submissions will be recorded to Quiz {quizNumber} tab</li>
                 </ul>
               </div>
             )}

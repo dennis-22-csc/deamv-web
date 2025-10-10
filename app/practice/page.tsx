@@ -501,7 +501,7 @@ function PracticePageContent() {
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<div className="max-w-6xl mx-auto px-4 py-6">
-					<Card className="p-8 text-center">Loading Challenges for **{category}**...</Card>
+					<Card className="p-8 text-center">Loading Challenges for <b>{category}</b>...</Card>
 				</div>
 			</div>
 		);
@@ -516,7 +516,7 @@ function PracticePageContent() {
 							<XCircle className="h-10 w-10 text-red-500 mx-auto" />
 							<h2 className="text-xl font-semibold">No Challenges Available</h2>
 							<p className="text-gray-600">
-								We couldn't find any challenges for the **{category}** category.
+								We couldn't find any challenges for the <b>{category}</b> category.
 							</p>
 							<Button onClick={() => router.push('/category-selection')}>
 								Select a different Category

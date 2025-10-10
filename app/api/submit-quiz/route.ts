@@ -1,18 +1,39 @@
 // app/api/submit-quiz/route.ts
 import { NextResponse } from 'next/server';
 import { quizFileProcessor, isGoogleSheetsConfigured } from '@/lib/quiz-file-processor';
+import authorizedStudents from '@/data/authorized_students.json';
+
 
 export async function POST(request: Request) {
   try {
     const submissionData = await request.json();
+    const registrationCode = submissionData.registrationCode as string;
     
     console.log('📝 [SubmitQuiz API] Quiz submission received:', {
-      registrationCode: submissionData.registrationCode,
+      registrationCode: registrationCode,
       answeredCount: submissionData.answeredCount,
       totalQuestions: submissionData.totalQuestions,
       timeSpent: submissionData.totalTime,
     });
-
+    
+    const isAuthorized = Object.keys(authorizedStudents).includes(registrationCode);
+    
+    if (!isAuthorized) {
+        const customErrorMessage = "You are trying to make a submission with a registration code not recognised by any of our partner institutions.";
+        
+        console.error(`🛑 [SubmitQuiz API] Unauthorized submission attempt: Code ${registrationCode} not found.`);
+        return NextResponse.json(
+          {
+            success: false,
+            error:  customErrorMessage,
+            googleSheetsSubmitted: false,
+          },
+          // Use 401 Unauthorized or 403 Forbidden status for security failure
+          { status: 403 } 
+        );
+    }
+    console.log(`✅ [SubmitQuiz API] Authorized submission for: ${registrationCode} (${authorizedStudents[registrationCode as keyof typeof authorizedStudents]})`);
+    
     // Submit to Google Sheets
     if (isGoogleSheetsConfigured()) {
       console.log('🔍 [SubmitQuiz API] Google Sheets configured, attempting submission');

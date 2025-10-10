@@ -75,7 +75,7 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
       {/* Answer Area */}
       <div className="space-y-4">
         <label htmlFor={`answer-${questionNumber}`} className="block text-sm font-medium text-gray-700">
-          Your Answer {question.Type === 'Practical' && '(Write code or commands)'}
+          Your Answer
         </label>
         
         <Textarea
@@ -84,7 +84,7 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
           onChange={(e) => handleAnswerChange(e.target.value)}
           placeholder={
             question.Type === 'Practical'
-              ? "Write your code or commands here..."
+              ? "Write your code here..."
               : "Write your explanation or answer here..."
           }
           rows={question.Type === 'Practical' ? 12 : 8}
@@ -112,7 +112,6 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
             <ul className="text-green-600 text-sm space-y-1">
               <li>• Write executable code with proper syntax</li>
               <li>• Include necessary imports and libraries</li>
-              <li>• Test your code mentally before writing</li>
               <li>• Use proper indentation and code structure</li>
             </ul>
           </div>
