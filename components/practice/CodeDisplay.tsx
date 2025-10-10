@@ -18,13 +18,11 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({
         ? code.replace(/\[object Object\]/g, '')
         : String(code || '').replace(/\[object Object\]/g, '');
 
-    // Add a CSS class or inline style to prevent selection
-    const noSelectStyle = {
-        // Standard property
+    const noSelectStyle: React.CSSProperties = {
         userSelect: 'none',
-        MozUserSelect: 'none', // Firefox
-        WebkitUserSelect: 'none', // Safari, Chrome, Opera
-        msUserSelect: 'none', // IE/Edge
+        MozUserSelect: 'none' as any, // Firefox
+        WebkitUserSelect: 'none' as any, // Safari, Chrome, Opera
+        msUserSelect: 'none' as any, // IE/Edge
     };
 
     return (

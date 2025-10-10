@@ -281,8 +281,6 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CodeDisplay
             code={userCode}
-            title="Your Solution"
-            language="python"
           />
           
           {finalVerdict === 'CORRECT' && (
