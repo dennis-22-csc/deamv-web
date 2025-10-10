@@ -245,49 +245,8 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({
               </Button>
             )}
 
-            {showSampleAnswer && sampleAnswer && onHideAnswer && (
-              <Button
-                onClick={onHideAnswer}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Lightbulb className="h-4 w-4" />
-                Hide Answer & Try Again
-              </Button>
-            )}
+           
 
-            {/* Feedback Rating */}
-            {!userRating && (
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-sm text-gray-600">Was this feedback helpful?</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRateFeedback('helpful')}
-                  className="flex items-center gap-1 text-green-600"
-                >
-                  <ThumbsUp className="h-4 w-4" />
-                  Yes
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRateFeedback('not-helpful')}
-                  className="flex items-center gap-1 text-red-600"
-                >
-                  <ThumbsDown className="h-4 w-4" />
-                  No
-                </Button>
-              </div>
-            )}
-
-            {userRating && (
-              <div className="ml-auto">
-                <span className="text-sm text-gray-600">
-                  Thank you for your feedback!
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </Card>
@@ -298,15 +257,10 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-600" />
             <h4 className="font-semibold text-gray-900">Sample Solution</h4>
-            <span className="text-sm text-gray-500">
-              Study this solution and try to implement it yourself
-            </span>
           </div>
           
           <CodeDisplay
             code={sampleAnswer}
-            title="Recommended Solution"
-            language="python"
           />
 
           <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
@@ -355,8 +309,6 @@ const FeedbackDisplay: React.FC<FeedbackDisplayProps> = ({
               </h4>
               <ul className="text-sm text-orange-800 space-y-1">
                 <li>• Read the problem statement carefully</li>
-                <li>• Break down the problem into smaller steps</li>
-                <li>• Test your code with different inputs</li>
                 <li>• Review Python syntax and common patterns</li>
                 <li>• Don't hesitate to use the "I don't know" option if stuck</li>
               </ul>

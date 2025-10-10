@@ -114,7 +114,7 @@ const ChallengeView: React.FC<ChallengeViewProps> = ({
               )}
             </h2>
             <p className="text-sm text-gray-600">
-              Write Python code to solve the problem below
+              Write Python code to complete the task below
             </p>
           </div>
         </div>
@@ -175,18 +175,6 @@ const ChallengeView: React.FC<ChallengeViewProps> = ({
             />
           </div>
 
-          {/* Requirements Hint */}
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">
-              Requirements:
-            </h4>
-            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
-              <li>Write Python code that solves the problem</li>
-              <li>Ensure your code is efficient and readable</li>
-              <li>Test your solution with different inputs</li>
-              <li>Follow Python best practices and style guidelines</li>
-            </ul>
-          </div>
         </div>
       </Card>
 
@@ -200,23 +188,8 @@ const ChallengeView: React.FC<ChallengeViewProps> = ({
           </div>
           <ul className="text-sm text-yellow-700 space-y-1">
             <li>• Read the problem carefully before coding</li>
-            <li>• Break down complex problems into smaller steps</li>
             <li>• Use meaningful variable names</li>
-            <li>• Add comments for complex logic</li>
-          </ul>
-        </Card>
-
-        {/* Expected Output Card */}
-        <Card className="p-4 bg-blue-50 border-blue-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Code className="h-4 w-4 text-blue-600" />
-            <h4 className="text-sm font-medium text-blue-800">What We're Looking For</h4>
-          </div>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Correct implementation of requirements</li>
-            <li>• Clean, readable code structure</li>
-            <li>• Proper error handling when applicable</li>
-            <li>• Efficient use of data structures</li>
+            <li>• Always import used packages</li>
           </ul>
         </Card>
       </div>
