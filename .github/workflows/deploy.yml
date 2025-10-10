@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml
 name: Deploy DeamV Web to DigitalOcean
 
 on:
@@ -21,18 +20,32 @@ jobs:
           node-version: '22.19.0'
           cache: 'npm'
 
-      # 2. Build Next.js Application
+      # 2. Build Next.js Application and create a reliable archive (FIXED)
       - name: Install dependencies and build Next.js app
         run: |
-          npm install --force # Use --force if you have peer dependency issues
+          npm install --force
           npm run build
-          # Create a compressed archive of the entire project,
-          # excluding node_modules and .git, but including the .next build
-          tar -czf nextjs_build.tar.gz \
-            --exclude=node_modules \
-            --exclude=.git \
-            .
-       
+          
+          echo "Starting artifact packaging to avoid 'file changed' error..."
+          
+          # 1. Create a clean temporary directory
+          mkdir -p build_archive_temp
+          
+          # 2. Use rsync to copy ONLY necessary files, excluding node_modules and .git
+          # This copies the build artifacts (.next) and source files to the temporary folder
+          rsync -av \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            --exclude 'nextjs_build.tar.gz' \
+            ./ build_archive_temp/
+          
+          # 3. Create a compressed archive of the contents *inside* the temp directory
+          # The -C flag changes the directory before creating the archive, ensuring a clean root path
+          tar -czf nextjs_build.tar.gz -C build_archive_temp .
+          
+          # 4. Clean up the temporary folder
+          rm -rf build_archive_temp
+        
       # 3. Verify files exist locally before copying
       - name: Verify deployment file locally
         run: |
@@ -95,20 +108,21 @@ jobs:
             TEMP_DIR="/tmp/nextjs_extract_$TIMESTAMP"
             mkdir -p "$TEMP_DIR"
             
+            # Extract to a temp directory
             tar -xzf "$DEPLOY_DIR/nextjs_build.tar.gz" -C "$TEMP_DIR"
             
+            # Remove old 'current' directory and replace with new build
             rm -rf "${BASE_DIR}/current"
-            mkdir -p "${BASE_DIR}/current"
+            mv "${TEMP_DIR}" "${BASE_DIR}/current" # Move the extracted folder to the target location
             
-            mv ${TEMP_DIR}/* ${BASE_DIR}/current/
-            
-            # 5c. Copy .env file
+            # 5c. Copy .env file (Ensure this file is placed on your DO server at /root/deamv_env)
             echo "Copying .env from /root/ to project directory..."
             ENV_FILE="/root/deamv_env"
             TARGET_ENV_FILE="${BASE_DIR}/current/.env"
             
             if [ -f "$ENV_FILE" ]; then
-              cp "$ENV_FILE" "$TARGET_ENV_FILE"
+              # NOTE: Using "cp -f" ensures the .env file is overwritten if it exists
+              cp -f "$ENV_FILE" "$TARGET_ENV_FILE"
               echo "Successfully copied $ENV_FILE to $TARGET_ENV_FILE"
             else
               echo "WARNING: $ENV_FILE not found! Production environment variables will be missing."
@@ -117,15 +131,16 @@ jobs:
             # 5d. Install Production Dependencies
             echo "Installing production dependencies..."
             cd "${BASE_DIR}/current"
+            # Since you excluded node_modules from the archive, you need to install production dependencies here
             npm install --production --prefer-offline 
             
             # 5e. Restart Next.js Service
             echo "Restarting Next.js service..."
+            # Assuming your Next.js service is named 'deamv' and managed by systemctl
             sudo systemctl restart deamv || echo "Warning: Could not restart Next.js service. Check systemctl."
 
             # 5f. Cleanup
             echo "Cleaning up deployment files..."
             rm -rf "$DEPLOY_DIR/nextjs_build.tar.gz"
-            rm -rf "$TEMP_DIR"
             
             echo "Deployment completed successfully! Next.js application is live."
