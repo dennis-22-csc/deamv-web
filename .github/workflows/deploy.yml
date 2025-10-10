@@ -20,10 +20,37 @@ jobs:
           node-version: '22.19.0'
           cache: 'npm'
 
-      # 2. Build Next.js Application and create a reliable archive (FIXED)
+      # =========================================================================
+      # 2. ⚠️ NEW STEP: Fetch .env content from Server and Set as GitHub Environment Variables
+      # This enables Next.js server routes to read variables during the build.
+      # =========================================================================
+      - name: Fetch .env from server and inject into build
+        uses: appleboy/ssh-action@v1.0.0
+        id: fetch_env
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          # Command to read the .env file and print it to stdout.
+          # The location /root/deamv_env is based on your original script.
+          script: |
+            cat /root/deamv_env
+        
+      - name: Export .env content as GitHub Environment Variables
+        run: |
+          # The output from the previous step's 'cat' command is available here.
+          # This line takes the content of the remote file and makes them available 
+          # as environment variables for the subsequent steps.
+          echo "${{ steps.fetch_env.outputs.stdout }}" >> $GITHUB_ENV
+        # The variables are now set and available for the 'npm run build' step.
+
+      # =========================================================================
+      # 3. Build Next.js Application (NOW WITH .env VARIABLES INJECTED)
+      # =========================================================================
       - name: Install dependencies and build Next.js app
         run: |
           npm install --force
+          # The build now runs with the necessary environment variables set from $GITHUB_ENV.
           npm run build
           
           echo "Starting artifact packaging to avoid 'file changed' error..."
@@ -46,7 +73,7 @@ jobs:
           # 4. Clean up the temporary folder
           rm -rf build_archive_temp
         
-      # 3. Verify files exist locally before copying
+      # 4. Verify files exist locally before copying (Original Step 3)
       - name: Verify deployment file locally
         run: |
           echo "Checking local deployment file:"
@@ -54,7 +81,7 @@ jobs:
           echo "File size:"
           du -h nextjs_build.tar.gz
 
-      # 4. Copy files to server
+      # 5. Copy files to server (Original Step 4)
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -65,7 +92,7 @@ jobs:
           target: "~/deployments"
           rm: true 
 
-      # 5. SSH into server & deploy
+      # 6. SSH into server & deploy (Original Step 5 - MODIFIED)
       - name: SSH into server & deploy with backup rotation
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -94,14 +121,14 @@ jobs:
               fi
             }
 
-            # 5a. Verify deployment file
+            # 6a. Verify deployment file
             echo "Checking for deployment file in $DEPLOY_DIR..."
             if [ ! -f "$DEPLOY_DIR/nextjs_build.tar.gz" ]; then
               echo "ERROR: nextjs_build.tar.gz not found!"
               exit 1
             fi
 
-            # 5b. Deploy Next.js
+            # 6b. Deploy Next.js
             echo "Deploying Next.js application..."
             rotate_backups "${BASE_DIR}/current"
             
@@ -115,36 +142,23 @@ jobs:
             rm -rf "${BASE_DIR}/current"
             mv "${TEMP_DIR}" "${BASE_DIR}/current" # Move the extracted folder to the target location
             
-            # 5c. Copy .env file (Ensure this file is placed on your DO server at /root/deamv_env)
-            echo "Copying .env from /root/ to project directory..."
-            ENV_FILE="/root/deamv_env"
-            TARGET_ENV_FILE="${BASE_DIR}/current/.env.production"
-            APP_USER="www-data" 
-            APP_GROUP="www-data" 
-            
-            if [ -f "$ENV_FILE" ]; then
-              # NOTE: Using "cp -f" ensures the .env file is overwritten if it exists
-              cp -f "$ENV_FILE" "$TARGET_ENV_FILE"
-              sudo chown ${APP_USER}:${APP_GROUP} "$TARGET_ENV_FILE"
-              echo "Successfully copied $ENV_FILE to $TARGET_ENV_FILE"
-            else
-              echo "WARNING: $ENV_FILE not found! Production environment variables will be missing."
-            fi
-            
-            # 5d. Install Production Dependencies
+            # ⚠️ REMOVED STEP 5c (Copy .env file)
+            # The environment variables are now compiled into the build, 
+            # so the separate .env file copy is no longer necessary for server routes.
+            # You might still need to set environment variables for runtime in your PM2/Systemd setup.
+
+            # 6c. Install Production Dependencies (Original Step 5d)
             echo "Installing production dependencies..."
             cd "${BASE_DIR}/current"
-            # Since you excluded node_modules from the archive, you need to install production dependencies here
             npm install --production --prefer-offline 
             npm install --save-dev typescript
             
-            # 5e. Restart Next.js Service
+            # 6d. Restart Next.js Service (Original Step 5e)
             echo "Restarting Next.js service..."
-            # Assuming your Next.js service is named 'deamv' and managed by systemctl
             sudo systemctl daemon-reload
             sudo systemctl restart deamv || echo "Warning: Could not restart Next.js service. Check systemctl."
 
-            # 5f. Cleanup
+            # 6e. Cleanup (Original Step 5f)
             echo "Cleaning up deployment files..."
             rm -rf "$DEPLOY_DIR/nextjs_build.tar.gz"
             
