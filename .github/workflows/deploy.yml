@@ -118,7 +118,7 @@ jobs:
             # 5c. Copy .env file (Ensure this file is placed on your DO server at /root/deamv_env)
             echo "Copying .env from /root/ to project directory..."
             ENV_FILE="/root/deamv_env"
-            TARGET_ENV_FILE="${BASE_DIR}/current/.env"
+            TARGET_ENV_FILE="${BASE_DIR}/current/.env.production"
             APP_USER="www-data" 
             APP_GROUP="www-data" 
             
