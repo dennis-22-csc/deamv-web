@@ -133,10 +133,12 @@ jobs:
             cd "${BASE_DIR}/current"
             # Since you excluded node_modules from the archive, you need to install production dependencies here
             npm install --production --prefer-offline 
+            npm install --save-dev typescript
             
             # 5e. Restart Next.js Service
             echo "Restarting Next.js service..."
             # Assuming your Next.js service is named 'deamv' and managed by systemctl
+            sudo systemctl daemon-reload
             sudo systemctl restart deamv || echo "Warning: Could not restart Next.js service. Check systemctl."
 
             # 5f. Cleanup
