@@ -20,11 +20,9 @@ jobs:
           node-version: '22.19.0'
           cache: 'npm'
 
-      # 2. Inject Environment Variables from GitHub Secrets
-      - name: Inject Environment Variables for Build
-        run: echo "Secrets will be injected into the build environment."
+      # 2. Build Next.js Application
+      - name: Install dependencies and build Next.js app 🚀
         env:
-          # Inject all environment variables here using the secrets
           NEXT_PUBLIC_GRADED_QUIZ_ENABLED: ${{ secrets.NEXT_PUBLIC_GRADED_QUIZ_ENABLED }}
           NEXT_PUBLIC_QUIZ_NUMBER: ${{ secrets.NEXT_PUBLIC_QUIZ_NUMBER }}
           NEXT_PUBLIC_QUIZ_TIME_LIMIT: ${{ secrets.NEXT_PUBLIC_QUIZ_TIME_LIMIT }}
@@ -33,10 +31,8 @@ jobs:
           GOOGLE_TEST_SHEET_ID: ${{ secrets.GOOGLE_TEST_SHEET_ID }}
           GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
           GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
-
-      # 3. Build Next.js Application
-      - name: Install dependencies and build Next.js app
         run: |
+          # The secrets are available in the shell environment when npm run build runs
           npm install --force
           npm run build
           
@@ -56,7 +52,7 @@ jobs:
           # 4. Clean up
           rm -rf build_archive_temp
         
-      # 4. Verify files exist locally before copying
+      # 3. Verify files exist locally before copying
       - name: Verify deployment file locally
         run: |
           echo "Checking local deployment file:"
@@ -64,7 +60,7 @@ jobs:
           echo "File size:"
           du -h nextjs_build.tar.gz
 
-      # 5. Copy files to server
+      # 4. Copy files to server
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -75,7 +71,7 @@ jobs:
           target: "~/deployments"
           rm: true 
 
-      # 6. SSH into server & deploy
+      # 5. SSH into server & deploy
       - name: SSH into server & deploy with backup rotation
         uses: appleboy/ssh-action@v1.0.0
         with:
