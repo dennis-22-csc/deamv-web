@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Volume2, VolumeX, CheckCircle, XCircle } from 'lucide-react';
+import { Suspense } from 'react'; // 👈 Import Suspense
 
 // UI Components
 import { Button } from '@/components/ui/Button';
@@ -74,7 +75,11 @@ interface PracticeState {
 	allChallengeAttempts: ChallengeAttempt[]; // Completed attempts log
 }
 
-export default function PracticePage() {
+// ----------------------------------------------------------------------
+// 1. New Component to hold the actual page logic and useSearchParams
+// ----------------------------------------------------------------------
+function PracticePageContent() {
+	// The useSearchParams hook is now correctly inside a component that will be wrapped
 	const searchParams = useSearchParams();
 	const category = searchParams.get('category') || 'General';
 	const router = useRouter();
@@ -131,6 +136,7 @@ export default function PracticePage() {
 
 	const loadChallenges = useCallback(async () => {
 		try {
+			// This depends on the category which is dynamic
 			const challenges = await practiceDatabase.getDataScienceChallengesByCategory(category);
 
 			if (challenges.length === 0) {
@@ -181,8 +187,11 @@ export default function PracticePage() {
 
 	// Load challenges on mount
 	useEffect(() => {
-		loadChallenges();
-	}, [loadChallenges]);
+		// Only load if challenges array is empty and not already loading
+		if (state.challenges.length === 0 && state.isLoading) {
+			loadChallenges();
+		}
+	}, [loadChallenges, state.challenges.length, state.isLoading]);
 
 	// Safe access to current challenge
 	const currentChallenge = state.challenges[state.currentChallengeIndex];
@@ -281,12 +290,12 @@ export default function PracticePage() {
 				throw new Error('API key not found. Please configure your Gemini API key in settings.');
 			}
 
-			// Prepare the payload 
+			// Prepare the payload 
 			const payload: EvaluationRequest = {
 				instruction: currentChallenge.instruction,
 				userCode: state.userCode,
 				expectedSolution: currentChallenge.solution,
-				apiKey: apiKey, 
+				apiKey: apiKey, 
 			};
 
 			// Use fetch to call the Route Handler
@@ -365,7 +374,7 @@ export default function PracticePage() {
 
 		const timeSpentSeconds = Math.round((Date.now() - currentAttempt.startTime) / 1000);
 
-		// FIX: Add the required 'timestamp' property.
+		// FIX: Add the required 'timestamp' property. (This was already in the original code but kept for completeness)
 		const finalAttempt: ChallengeAttempt = {
 			challengeId: currentChallenge.id,
 			isCorrect: state.isCorrect === true, // The final result for this challenge
@@ -492,7 +501,7 @@ export default function PracticePage() {
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<div className="max-w-6xl mx-auto px-4 py-6">
-					<Card className="p-8 text-center">Loading Challenges...</Card>
+					<Card className="p-8 text-center">Loading Challenges for **{category}**...</Card>
 				</div>
 			</div>
 		);
@@ -639,4 +648,23 @@ export default function PracticePage() {
 			/>
 		</div>
 	);
+}
+
+// ----------------------------------------------------------------------
+// 2. Default Export with Suspense Boundary
+// ----------------------------------------------------------------------
+export default function PracticePage() {
+    return (
+        // Wrapping the component that uses useSearchParams() in a Suspense boundary
+        // fixes the prerendering error during the build process.
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50">
+                <div className="max-w-6xl mx-auto px-4 py-6">
+                    <Card className="p-8 text-center">Loading application...</Card>
+                </div>
+            </div>
+        }>
+            <PracticePageContent />
+        </Suspense>
+    );
 }
