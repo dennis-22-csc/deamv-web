@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       console.log('🔍 [SubmitQuiz API] Google Sheets configured, attempting submission');
       const submissionResult = await quizFileProcessor.submitQuizResults(
         submissionData, 
-        process.env.GOOGLE_TEST_SHEET_ID!
+        process.env.NEXT_GOOGLE_TEST_SHEET_ID!
       );
       
       if (submissionResult.success) {

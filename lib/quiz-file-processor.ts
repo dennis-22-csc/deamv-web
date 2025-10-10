@@ -365,13 +365,13 @@ class QuizFileProcessor {
 
 // Create singleton instance with environment configuration
 export const quizFileProcessor = new QuizFileProcessor({
-  serviceAccountEmail: process.env.GOOGLE_CLIENT_EMAIL || '',
-  privateKey: process.env.GOOGLE_PRIVATE_KEY || ''
+  serviceAccountEmail: process.env.NEXT_GOOGLE_CLIENT_EMAIL || '',
+  privateKey: process.env.NEXT_GOOGLE_PRIVATE_KEY || ''
 });
 
 // Utility function to check if Google Drive is configured
 export const isGoogleDriveConfigured = (): boolean => {
-  const isConfigured = !!(process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
+  const isConfigured = !!(process.env.NEXT_GOOGLE_CLIENT_EMAIL && process.env.NEXT_GOOGLE_PRIVATE_KEY);
   
   console.log('🔍 [QuizFileProcessor] Google Drive configured:', isConfigured);
   return isConfigured;
@@ -379,7 +379,7 @@ export const isGoogleDriveConfigured = (): boolean => {
 
 // Utility function to check if Google Sheets is configured
 export const isGoogleSheetsConfigured = (): boolean => {
-  const isConfigured = !!(process.env.GOOGLE_TEST_SHEET_ID && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
+  const isConfigured = !!(process.env.NEXT_GOOGLE_TEST_SHEET_ID && process.env.NEXT_GOOGLE_CLIENT_EMAIL && process.env.NEXT_GOOGLE_PRIVATE_KEY);
   
   console.log('🔍 [QuizFileProcessor] Google Sheets configured:', isConfigured);
   return isConfigured;
