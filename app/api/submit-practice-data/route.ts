@@ -3,9 +3,9 @@ import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library'; 
 import { NextResponse } from 'next/server';
 
-const SPREADSHEET_ID = process.env.NEXT_GOOGLE_PRACTICE_SHEET_ID;
-const SERVICE_ACCOUNT_EMAIL = process.env.NEXT_GOOGLE_CLIENT_EMAIL;
-const PRIVATE_KEY = process.env.NEXT_GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'); 
+const SPREADSHEET_ID = process.env.NEXT_PUBLIC_GOOGLE_PRACTICE_SHEET_ID;
+const SERVICE_ACCOUNT_EMAIL = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL;
+const PRIVATE_KEY = process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'); 
 
 const SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',

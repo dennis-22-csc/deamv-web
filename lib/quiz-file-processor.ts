@@ -373,8 +373,8 @@ export const quizFileProcessor = new QuizFileProcessor({
 export const isGoogleDriveConfigured = (): boolean => {
   const isConfigured = !!(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL && process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
   
-  console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_CLIENT_EMAIL:', process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL);
-  console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_PRIVATE_KEY:', process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
+  //console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_CLIENT_EMAIL:', process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL);
+  //console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_PRIVATE_KEY:', process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
   
   
   console.log('🔍 [QuizFileProcessor] Google Drive configured:', isConfigured);
@@ -385,9 +385,9 @@ export const isGoogleDriveConfigured = (): boolean => {
 export const isGoogleSheetsConfigured = (): boolean => {
   const isConfigured = !!(process.env.NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL && process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
   
-  console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_CLIENT_EMAIL:', process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL);
-  console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_PRIVATE_KEY:', process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
-  console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_TEST_SHEET_ID:', process.env.NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID);
+  //console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_CLIENT_EMAIL:', process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL);
+  //console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_PRIVATE_KEY:', process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
+  //console.log('🔍 [QuizFileProcessor] NEXT_GOOGLE_TEST_SHEET_ID:', process.env.NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID);
   
   
   
