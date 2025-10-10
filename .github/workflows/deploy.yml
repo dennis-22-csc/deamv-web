@@ -119,10 +119,13 @@ jobs:
             echo "Copying .env from /root/ to project directory..."
             ENV_FILE="/root/deamv_env"
             TARGET_ENV_FILE="${BASE_DIR}/current/.env"
+            APP_USER="www-data" 
+            APP_GROUP="www-data" 
             
             if [ -f "$ENV_FILE" ]; then
               # NOTE: Using "cp -f" ensures the .env file is overwritten if it exists
               cp -f "$ENV_FILE" "$TARGET_ENV_FILE"
+              sudo chown ${APP_USER}:${APP_GROUP} "$TARGET_ENV_FILE"
               echo "Successfully copied $ENV_FILE to $TARGET_ENV_FILE"
             else
               echo "WARNING: $ENV_FILE not found! Production environment variables will be missing."
