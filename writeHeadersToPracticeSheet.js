@@ -5,8 +5,8 @@ dotenv.config();
 // Authenticate using env variables
 const auth = new google.auth.GoogleAuth({
   credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL,
+    private_key: process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
   },
   scopes: [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -17,7 +17,7 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: 'v4', auth });
 
 async function setupClassSheets() {
-  const spreadsheetId = process.env.GOOGLE_PRACTICE_SHEET_ID;
+  const spreadsheetId = process.env.NEXT_PUBLIC_GOOGLE_PRACTICE_SHEET_ID;
   const headers = [
     'sessionId',
     'registrationCode',

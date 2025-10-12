@@ -5,8 +5,8 @@ dotenv.config();
 // Authenticate using env variables
 const auth = new google.auth.GoogleAuth({
   credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL,
+    private_key: process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
   },
   scopes: [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -21,7 +21,7 @@ const sheets = google.sheets({ version: 'v4', auth });
  * and writes the submission headers to the first row of each tab.
  */
 async function setupQuizSheets() {
-  const spreadsheetId = process.env.GOOGLE_TEST_SHEET_ID;
+  const spreadsheetId = process.env.NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID;
   
   // Headers for quiz data submission, tailored for metrics and identifiers
   const headers = [
