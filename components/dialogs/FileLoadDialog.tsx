@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { 
-	Upload, 
-	FileText, 
-	X, 
-	CheckCircle2, 
-	AlertCircle, 
+import { 
+	Upload, 
+	FileText, 
+	X, 
+	CheckCircle2, 
+	AlertCircle, 
 	Database,
 	Download,
 	HelpCircle
@@ -18,7 +18,7 @@ interface FileLoadDialogProps {
 	onClose: () => void;
 	// Updated onConfirm signature to optionally accept a File, allowing the dialog
 	// to pass a drag-and-dropped file back to the parent.
-	onConfirm: (file?: File) => void; 
+	onConfirm: (file?: File) => void; 
 	title?: string;
 	message?: string;
 	acceptedFileTypes?: string[];
@@ -46,7 +46,7 @@ const FileLoadDialog: React.FC<FileLoadDialogProps> = ({
 		setError('');
 		setIsDragging(false);
 		if (fileInputRef.current) {
-			  fileInputRef.current.value = '';
+			  fileInputRef.current.value = '';
 		}
 	};
 
@@ -58,7 +58,7 @@ const FileLoadDialog: React.FC<FileLoadDialogProps> = ({
 	const validateFile = (file: File): boolean => {
 		// Check file type
 		const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-		const isValidType = acceptedFileTypes.some(type => 
+		const isValidType = acceptedFileTypes.some(type => 
 			type.startsWith('.') ? fileExtension === type : file.type === type
 		);
 
@@ -122,7 +122,7 @@ const FileLoadDialog: React.FC<FileLoadDialogProps> = ({
 	};
 
 	const handleConfirm = () => {
-		// CRITICAL FIX: Pass the file if one was drag-and-dropped. 
+		// CRITICAL FIX: Pass the file if one was drag-and-dropped. 
 		// Otherwise, pass undefined, signaling the parent to open the OS file picker.
 		onConfirm(selectedFile || undefined);
 		
@@ -173,7 +173,7 @@ const FileLoadDialog: React.FC<FileLoadDialogProps> = ({
 			showCloseButton={true}
 			className={className}
 		>
-			<div className="space-y-6">
+			<div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2"> {/* ADDED max-h-[70vh] and overflow-y-auto */}
 				{/* Message */}
 				{message && (
 					<p className="text-gray-600 text-sm leading-relaxed">
@@ -185,10 +185,10 @@ const FileLoadDialog: React.FC<FileLoadDialogProps> = ({
 				<div
 					className={`
 						border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200
-						${isDragging 
-							? 'border-blue-400 bg-blue-50' 
-							: selectedFile 
-								? 'border-green-400 bg-green-50' 
+						${isDragging 
+							? 'border-blue-400 bg-blue-50' 
+							: selectedFile 
+								? 'border-green-400 bg-green-50' 
 								: 'border-gray-300 bg-gray-50 hover:border-gray-400'
 						}
 						cursor-pointer
@@ -299,8 +299,8 @@ const FileLoadDialog: React.FC<FileLoadDialogProps> = ({
 
 							<div className="flex items-center gap-2 text-xs">
 								<Download className="h-3 w-3" />
-								<a 
-									href="#" 
+								<a 
+									href="#" 
 									onClick={(e) => {
 										e.preventDefault();
 										// In a real app, this would download a template file
@@ -387,7 +387,7 @@ const FileLoadProgressDialog: React.FC<FileLoadProgressDialogProps> = ({
 			closeOnOverlayClick={false}
 			className={className}
 		>
-			<div className="space-y-4">
+			<div className="space-y-4"> {/* Kept as space-y-4, not adding scroll as content is fixed and small */}
 				{/* File Info */}
 				{fileName && (
 					<div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
@@ -409,7 +409,7 @@ const FileLoadProgressDialog: React.FC<FileLoadProgressDialogProps> = ({
 					</div>
 					
 					<div className="w-full bg-gray-200 rounded-full h-2">
-						<div 
+						<div 
 							className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
 							style={{ width: `${progress}%` }}
 						/>
@@ -462,7 +462,7 @@ const FileLoadSuccessDialog: React.FC<FileLoadSuccessDialogProps> = ({
 			showCloseButton={true}
 			className={className}
 		>
-			<div className="space-y-6">
+			<div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2"> {/* ADDED max-h-[70vh] and overflow-y-auto */}
 				{/* Success Icon */}
 				<div className="text-center">
 					<div className="mx-auto h-16 w-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -534,8 +534,8 @@ const FileLoadSuccessDialog: React.FC<FileLoadSuccessDialogProps> = ({
 	);
 };
 
-export { 
-	FileLoadDialog, 
-	FileLoadProgressDialog, 
-	FileLoadSuccessDialog 
+export { 
+	FileLoadDialog, 
+	FileLoadProgressDialog, 
+	FileLoadSuccessDialog 
 };

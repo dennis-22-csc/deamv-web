@@ -105,7 +105,7 @@ const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
 			loading={isTesting}
 			showCloseButton={true}
 		>
-			<div className="space-y-6">
+			<div className="space-y-6 max-h-96 overflow-y-auto pr-2"> {/* ADDED max-h-96 and overflow-y-auto */}
 				{/* Description */}
 				<div className="text-gray-600 text-sm leading-relaxed">
 					{description}
@@ -190,7 +190,7 @@ const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
 								Security & Privacy
 							</h5>
 							<p className="text-xs text-gray-600">
-								Your API key is stored securely on your device and is only used to communicate 
+								Your API key is stored securely on your device and is only used to communicate 
 								directly with Google's Gemini API. We never send your API key to our servers.
 							</p>
 						</div>
@@ -241,16 +241,16 @@ const QuickApiKeyDialog: React.FC<QuickApiKeyDialogProps> = ({
 			props.onSave(localApiKey.trim());
 		}
 	};
-    
-    // Create a custom handler for the dialog close event, which will fire when 
-    // the 'Cancel' button (labeled 'Continue without key') is clicked.
-    const handleCloseOrContinue = () => {
-        if (onContinueWithoutKey) {
-            onContinueWithoutKey();
-        } else {
-            props.onClose();
-        }
-    }
+    
+    // Create a custom handler for the dialog close event, which will fire when 
+    // the 'Cancel' button (labeled 'Continue without key') is clicked.
+    const handleCloseOrContinue = () => {
+        if (onContinueWithoutKey) {
+            onContinueWithoutKey();
+        } else {
+            props.onClose();
+        }
+    }
 
 	return (
 		<Dialog
@@ -264,7 +264,7 @@ const QuickApiKeyDialog: React.FC<QuickApiKeyDialogProps> = ({
 			// FIX: Remove onCancel
 			showCloseButton={true}
 		>
-			<div className="space-y-6">
+			<div className="space-y-6 max-h-96 overflow-y-auto pr-2"> {/* ADDED max-h-96 and overflow-y-auto */}
 				<div className="text-gray-600 text-sm leading-relaxed">
 					You need a Gemini API key to start practicing. Get one for free from Google AI Studio, or enter your existing key below.
 				</div>
@@ -332,7 +332,7 @@ const ApiKeyManagementDialog: React.FC<ApiKeyManagementDialogProps> = ({
 }) => {
 	const [showCurrentKey, setShowCurrentKey] = useState(false);
 	const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-	const maskedKey = currentApiKey 
+	const maskedKey = currentApiKey 
 		? `${currentApiKey.substring(0, 8)}${'•'.repeat(20)}${currentApiKey.substring(28)}`
 		: 'Not set';
 
@@ -353,7 +353,7 @@ const ApiKeyManagementDialog: React.FC<ApiKeyManagementDialogProps> = ({
 				// FIX: Remove onCancel
 				showCloseButton={true}
 			>
-				<div className="space-y-6">
+				<div className="space-y-6 max-h-96 overflow-y-auto pr-2"> {/* ADDED max-h-96 and overflow-y-auto */}
 					{/* Current Key Status */}
 					<div className="bg-gray-50 rounded-lg p-4">
 						<div className="flex items-center justify-between">
@@ -443,7 +443,7 @@ const ApiKeyManagementDialog: React.FC<ApiKeyManagementDialogProps> = ({
 				onGetKey={onGetKey}
 				initialApiKey={currentApiKey}
 				title={currentApiKey ? "Update API Key" : "Add API Key"}
-				description={currentApiKey 
+				description={currentApiKey 
 					? "Enter a new Gemini API key to replace the current one."
 					: "Enter your Gemini API key to enable AI-powered code evaluation and feedback."
 				}

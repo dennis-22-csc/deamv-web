@@ -91,9 +91,6 @@ export default function Home() {
 			<div className="max-w-md w-full space-y-8">
 				{/* Header */}
 				<div className="text-center">
-					<div className="mx-auto h-20 w-20 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-						<Settings className="h-10 w-10 text-white" />
-					</div>
 					<h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to DeamV</h1>
 					<p className="text-gray-600">Practice your data science skills with AI-powered feedback</p>
 				</div>
@@ -102,9 +99,8 @@ export default function Home() {
 				<Card className="p-8 space-y-6">
 					<div className="text-center space-y-4">
 						<p className="text-gray-700">
-							{apiKey
-								? 'Ready to begin your practice session!'
-								: 'Get started by setting up your Gemini API key'}
+							Ready to begin your practice session!
+							
 						</p>
 
 						{/* Practice Button */}
@@ -113,7 +109,7 @@ export default function Home() {
 							className="w-full flex items-center justify-center gap-2"
 							size="lg"
 						>
-							<Play className="h-5 w-5" />
+							
 							Begin Class Practice
 						</Button>
 
@@ -132,7 +128,7 @@ export default function Home() {
 								>
 									{GRADED_QUIZ_ENABLED ? (
 										<>
-											<Award className="h-5 w-5" />
+											
 											Take Graded Quiz
 										</>
 									) : (
@@ -151,9 +147,7 @@ export default function Home() {
 							</div>
 						)}
 
-						{!apiKey && (
-							<p className="text-sm text-gray-500">You'll need a Gemini API key to continue</p>
-						)}
+						
 					</div>
 
 					{/* API Key Status */}
