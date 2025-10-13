@@ -121,7 +121,7 @@ export default function NotebookUploadPage() {
         <div className="flex flex-col items-center justify-start min-h-screen bg-gray-50 p-4 sm:p-8">
             <div className="w-full max-w-3xl text-center space-y-4 mb-12 mt-10">
                 <h1 className="text-4xl font-extrabold text-gray-900 md:text-5xl">
-                    <span className="text-blue-600">Notebook Submission
+                    Notebook Submission
                 </h1>
                 <p className="text-lg text-gray-600">
                     Submit your completed Colab notebook by providing the required information and the public link.
