@@ -121,7 +121,7 @@ export default function NotebookUploadPage() {
         <div className="flex flex-col items-center justify-start min-h-screen bg-gray-50 p-4 sm:p-8">
             <div className="w-full max-w-3xl text-center space-y-4 mb-12 mt-10">
                 <h1 className="text-4xl font-extrabold text-gray-900 md:text-5xl">
-                    <span className="text-blue-600">SFAI DV Colab</span> Notebook Submission
+                    <span className="text-blue-600">Notebook Submission
                 </h1>
                 <p className="text-lg text-gray-600">
                     Submit your completed Colab notebook by providing the required information and the public link.
@@ -133,7 +133,7 @@ export default function NotebookUploadPage() {
                 <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-200 w-full text-center space-y-6">
                     <h2 className="text-2xl font-semibold text-gray-700">Ready to Submit?</h2>
                     <p className="text-md text-gray-500">
-                        Click the button below to upload your notebook link, student information, and <strong>Registration Code</strong>.
+                        Click the button below.
                     </p>
 
                     {/* The primary action button - now centralized */}
@@ -147,7 +147,7 @@ export default function NotebookUploadPage() {
                         ) : (
                             <>
                                 <Upload className="h-6 w-6" />
-                                Submit Notebook Link
+                                Submit Notebook
                             </>
                         )}
                     </Button>

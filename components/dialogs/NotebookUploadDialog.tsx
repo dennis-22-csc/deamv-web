@@ -62,7 +62,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 	isOpen,
 	onClose,
 	onConfirm,
-	title = "Upload Jupyter Notebook Link",
+	title = "Submit Colab Notebook Link",
 	classOptions,
 	className = '',
 }) => {
@@ -141,7 +141,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 			onClose={handleClose}
 			title={title}
 			variant="default"
-			confirmText="Upload Notebook"
+			confirmText="Submit Link"
 			cancelText="Cancel"
 			onConfirm={handleConfirm}
 			showCloseButton={true}
@@ -196,7 +196,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
                 
 				{/* Notebook Link Input */}
                 <Input
-                    label="Colab/Jupyter Notebook Link"
+                    label="Colab Notebook Link"
                     name="notebookUrl"
                     value={formData.notebookUrl}
                     onChange={handleChange}
@@ -218,7 +218,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 						
 						
                             <p className='text-xs'>
-                                <strong>Note:</strong> Ensure your Colab link is <strong>Publicly viewable</strong> for the upload to succeed.
+                                <strong>Note:</strong> Ensure your Colab link is <strong>Publicly viewable</strong> for the submission to succeed.
                             </p>
 						
 					</div>
