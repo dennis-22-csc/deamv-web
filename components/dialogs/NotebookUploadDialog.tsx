@@ -8,7 +8,8 @@ import {
 	Download,
 	HelpCircle,
     User,
-    BookOpen
+    BookOpen,
+    Key 
 } from 'lucide-react';
 import { Dialog } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
@@ -39,11 +40,13 @@ const Select: React.FC<SelectProps> = ({ label, options, ...props }) => (
 );
 
 
+// 1. UPDATED INTERFACE to include registrationCode
 interface NotebookUploadData {
     firstName: string;
     lastName: string;
     className: string;
     notebookUrl: string;
+    registrationCode: string; // <-- NEW FIELD
 }
 
 interface NotebookUploadDialogProps {
@@ -68,6 +71,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 		lastName: '',
 		className: '',
 		notebookUrl: '',
+        registrationCode: '', // <-- INITIALIZE NEW FIELD
 	});
 	const [error, setError] = useState('');
 
@@ -77,6 +81,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 			lastName: '',
 			className: '',
 			notebookUrl: '',
+            registrationCode: '', // <-- RESET NEW FIELD
 		});
 		setError('');
 	};
@@ -86,6 +91,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 		onClose();
 	};
 
+	// 3. UPDATED VALIDATION to check for registrationCode
 	const validateForm = (data: NotebookUploadData): boolean => {
 		if (!data.firstName.trim()) {
 			setError("First Name is required.");
@@ -97,6 +103,10 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 		}
 		if (!data.className) {
 			setError("Class is required.");
+			return false;
+		}
+        if (!data.registrationCode.trim()) { // <-- NEW VALIDATION CHECK
+			setError("Registration Code is required for submission authorization.");
 			return false;
 		}
 		if (!data.notebookUrl.trim() || !data.notebookUrl.includes('colab.research.google.com/drive/')) {
@@ -115,16 +125,14 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 	};
 
 	const handleConfirm = () => {
-		// The confirmation action is only executed if the form validates,
-		// which prevents submission if fields are missing.
 		if (validateForm(formData)) {
 			onConfirm(formData);
-			
+			// The validation check here ensures onConfirm only runs if the data is valid.
 		}
 	};
     
-    // This variable is no longer needed since the prop is unsupported, but keeping the logic for reference.
-    const isConfirmDisabled = !formData.firstName || !formData.lastName || !formData.className || !formData.notebookUrl;
+    // isConfirmDisabled is now unused but harmless to keep defined.
+    const isConfirmDisabled = !formData.firstName || !formData.lastName || !formData.className || !formData.notebookUrl || !formData.registrationCode;
 
 
 	return (
@@ -137,14 +145,15 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 			cancelText="Cancel"
 			onConfirm={handleConfirm}
 			showCloseButton={true}
-                      	className={className}
+			// REMOVED: confirmDisabled={isConfirmDisabled} (This was the problematic prop)
+			className={className}
 		>
 			<div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
 
 				{/* Description */}
 				<p className="text-gray-600 text-sm leading-relaxed flex items-center gap-2">
                     <Download className="h-4 w-4 text-blue-500 flex-shrink-0" />
-					Please provide your details and the Google Colab link for the notebook you wish to upload.
+					Please provide the necessary details
 				</p>
 
 				{/* User/Class Info */}
@@ -166,6 +175,16 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
                         maxLength={50}
                     />
                 </div>
+                
+                {/* Registration Code Input */}
+                <Input
+                    label="Registration Code"
+                    name="registrationCode"
+                    value={formData.registrationCode}
+                    onChange={handleChange}
+                    placeholder="Enter your student registration code"
+                    maxLength={100}
+                />
                 
                 <Select
                     label="Associated Class"
@@ -193,7 +212,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 					</div>
 				)}
 
-				{/* File Requirements Card (Adapted) */}
+				{/* File Requirements Card */}
 				<Card className="bg-blue-50 border-blue-200">
 					<div className="space-y-3">
 						
@@ -209,4 +228,4 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
 	);
 };
 
-export { NotebookUploadDialog };
+export { NotebookUploadDialog, type NotebookUploadData };

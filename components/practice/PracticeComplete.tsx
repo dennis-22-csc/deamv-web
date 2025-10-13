@@ -2,11 +2,10 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, UploadCloud, CornerDownLeft, Repeat2, Database, Award } from 'lucide-react';
+import { CheckCircle, UploadCloud, CornerDownLeft, Repeat2, Database, Award, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
-// Assuming these types and utilities exist as referenced in the original code
 import { practiceDatabase, PracticeDataPayload, PendingUpload } from '@/lib/database';
 
 const API_ENDPOINT = '/api/submit-practice-data';
@@ -16,9 +15,16 @@ const requiresDataSubmission = (category: string): boolean => {
     return category.trim().toLowerCase().startsWith('class');
 };
 
-const uploadPracticeData = async (payload: PracticeDataPayload, useSheet: boolean = true): Promise<boolean> => {
+// Define a new type for the submission result
+interface UploadResult {
+    success: boolean;
+    isUnauthorized: boolean; // <-- New flag
+    errorMessage?: string;
+}
+
+// 1. UPDATED uploadPracticeData function
+const uploadPracticeData = async (payload: PracticeDataPayload, useSheet: boolean = true): Promise<UploadResult> => {
     try {
-        // Ensure dates are properly formatted before sending
         const sanitizedPayload = {
             ...payload,
             startTime: payload.startTime instanceof Date ? payload.startTime : new Date(payload.startTime),
@@ -35,14 +41,36 @@ const uploadPracticeData = async (payload: PracticeDataPayload, useSheet: boolea
 
         if (response.ok) {
             console.log("Practice Data successfully submitted to server:", sanitizedPayload);
-            return true;
+            return { success: true, isUnauthorized: false };
         } else {
-            console.error("Server API Submission Failed:", await response.text());
-            return false;
+            const errorText = await response.text();
+            console.error("Server API Submission Failed:", errorText);
+
+            // Check if the server returned a 403 Forbidden status
+            if (response.status === 403) {
+                // Attempt to parse the JSON error body
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    // Check for the specific error message returned by your API route
+                    if (errorJson.error === "Registration code not recognized by our partner institutions.") {
+                        return { 
+                            success: false, 
+                            isUnauthorized: true, 
+                            errorMessage: errorJson.error 
+                        };
+                    }
+                } catch (e) {
+                    console.warn("Could not parse JSON error response for 403 status:", e);
+                }
+            }
+            
+            // Default failure (network timeout, general server error, other 4xx/5xx)
+            return { success: false, isUnauthorized: false, errorMessage: `Submission failed with status ${response.status}` };
         }
     } catch (error) {
         console.error("Network error during practice data submission:", error);
-        return false;
+        // Network errors are considered general failures, not unauthorized errors
+        return { success: false, isUnauthorized: false, errorMessage: 'Network or internal error' };
     }
 };
 
@@ -50,24 +78,23 @@ interface PracticeCompleteProps {
     sessionData: PracticeDataPayload;
 }
 
-// Simple reusable component for stats display - REVISED FOR RESPONSIVENESS
+// Simple reusable component for stats display
 const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
-    // Responsive: flex-col on mobile, flex-row on small screens and up (sm:), better padding and hover effects
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-white rounded-xl border border-gray-200 shadow-sm transition duration-300 ease-in-out hover:shadow-md hover:border-indigo-300">
         <span className="text-gray-600 font-medium text-base mb-1 sm:mb-0">{label}</span>
-        {/* Value: Larger text, always bold and prominent */}
         <span className="text-xl font-extrabold text-indigo-600 mt-0.5 sm:mt-0">{value}</span>
     </div>
 );
 
+// 2. UPDATED PracticeComplete component
 export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData }) => {
     const router = useRouter();
     const [registrationCode, setRegistrationCode] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submissionStatus, setSubmissionStatus] = useState<'initial' | 'success' | 'failed' | 'persisted'>('initial');
+    const [submissionStatus, setSubmissionStatus] = useState<'initial' | 'success' | 'failed' | 'persisted' | 'unauthorized'>('initial');
+    const [submissionError, setSubmissionError] = useState(''); 
     const [pendingUploadCount, setPendingUploadCount] = useState(0);
 
-    // Check if current category requires data submission (starts with "Class")
     const currentCategoryRequiresSubmission = useMemo(() => {
         return requiresDataSubmission(sessionData.category);
     }, [sessionData.category]);
@@ -79,12 +106,11 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
         const totalDontKnows = sessionData.attempts.filter(a => a.showAnswerClicked).length;
         const totalFirstTrialSuccess = completedChallenges.filter(a => a.gotOnFirstTrial).length;
 
-        // Calculate average trials for questions *not* gotten on the first try
         const retriedChallenges = completedChallenges.filter(a => a.trials > 1);
         const totalRetrialTrials = retriedChallenges.reduce((sum, a) => sum + (a.trials - 1), 0);
         const avgTrialsForRetries = retriedChallenges.length > 0
-            ? (totalRetrialTrials / retriedChallenges.length) + 1 // +1 for the first failed attempt
-            : 1; // 1 means no retries were needed
+            ? (totalRetrialTrials / retriedChallenges.length) + 1
+            : 1;
 
         return {
             totalQuestionsCompleted,
@@ -101,62 +127,19 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
             ...sessionData,
             startTime: sessionData.startTime instanceof Date ? sessionData.startTime : new Date(sessionData.startTime),
             endTime: sessionData.endTime instanceof Date ? sessionData.endTime : new Date(sessionData.endTime),
-            // Fix attempts timestamp
             attempts: sessionData.attempts.map(attempt => ({
                 ...attempt,
-                timestamp: attempt.timestamp ? (attempt.timestamp instanceof Date ? attempt.timestamp : new Date(attempt.timestamp)) : new Date(), // Fixed: ensure timestamp is always a Date for the final payload
+                timestamp: attempt.timestamp ? (attempt.timestamp instanceof Date ? attempt.timestamp : new Date(attempt.timestamp)) : new Date(),
             }))
         };
     }, [sessionData]);
 
+
     // --- Data Submission and Retry Logic ---
 
-    // 1. Initial Submit (or Retry from UI)
-    const handleSubmitData = async (code: string, data: PracticeDataPayload) => {
-        // Only submit if category requires data submission
-        if (!requiresDataSubmission(data.category)) {
-            console.log(`Skipping submission for non-Class category: ${data.category}`);
-            setSubmissionStatus('success'); // Mark as success since no submission needed
-            return;
-        }
-
-        // Enforce non-empty code if submissionStatus is 'initial'
-        if (submissionStatus === 'initial' && !code.trim()) {
-            console.warn("Registration code is required.");
-            return;
-        }
-
-        setIsSubmitting(true);
-        // Ensure code is not null/empty string if we proceed
-        const finalPayload = { ...data, registrationCode: code.trim() || null };
-
-        try {
-            const success = await uploadPracticeData(finalPayload);
-
-            if (success) {
-                setSubmissionStatus('success');
-            } else {
-                // Server failed -> Persist locally
-                await practiceDatabase.addPendingUpload(finalPayload);
-                setSubmissionStatus('persisted');
-                await checkPendingUploads(); // Update count
-            }
-        } catch (error) {
-            console.error('Submission failed due to network error:', error);
-            // Network error -> Persist locally
-            await practiceDatabase.addPendingUpload(finalPayload);
-            setSubmissionStatus('persisted');
-            await checkPendingUploads(); // Update count
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    // 3. Initial check and setup background worker
+    // Initial check and setup background worker
     const checkPendingUploads = useCallback(async () => {
-        // FIX: Use the instance method
         const allPending = await practiceDatabase.getPendingUploads() as PendingUpload[];
-        // Only count pending uploads for Class categories with proper type checking
         const classPending = Array.isArray(allPending)
             ? allPending.filter(upload =>
                 requiresDataSubmission(upload.payload.category)
@@ -165,12 +148,9 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
         setPendingUploadCount(classPending.length);
     }, []);
 
-    // 2. Background Retry Worker - Only retry Class categories
+    // Background Retry Worker
     const processPendingUploads = useCallback(async () => {
-        // FIX: Use the instance method
         const allPendingUploads = await practiceDatabase.getPendingUploads() as PendingUpload[];
-
-        // Filter to only Class categories with proper type checking
         const classPendingUploads = Array.isArray(allPendingUploads)
             ? allPendingUploads.filter(upload =>
                 requiresDataSubmission(upload.payload.category)
@@ -186,15 +166,17 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
                 const finalPayload = upload.payload;
 
                 try {
-                    const success = await uploadPracticeData(finalPayload);
+                    const result = await uploadPracticeData(finalPayload);
 
-                    if (success) {
-                        // FIX: Use the instance method
+                    if (result.success) {
                         await practiceDatabase.removePendingUpload(upload.id);
                         console.log(`Pending upload ${upload.id} successfully processed and removed.`);
+                    } else if (result.isUnauthorized) {
+                        // If UNAUTHORIZED error occurs on a retry, REMOVE the data (it's invalid)
+                        await practiceDatabase.removePendingUpload(upload.id);
+                        console.warn(`Pending upload ${upload.id} failed due to unauthorized code. Data removed from pending queue.`);
                     } else {
-                        // Failed again
-                        // FIX: Use the instance method
+                        // Failed again (general error)
                         await practiceDatabase.updatePendingUpload({
                             ...upload,
                             attempts: upload.attempts + 1,
@@ -204,7 +186,6 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
                     }
                 } catch (error) {
                     // Network error during retry
-                    // FIX: Use the instance method
                     await practiceDatabase.updatePendingUpload({
                         ...upload,
                         attempts: upload.attempts + 1,
@@ -215,7 +196,7 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
             }
         }
 
-        // Clean up non-Class pending uploads (they don't need to be retried)
+        // Clean up non-Class pending uploads
         const nonClassPendingUploads = Array.isArray(allPendingUploads)
             ? allPendingUploads.filter(upload =>
                 !requiresDataSubmission(upload.payload.category)
@@ -223,16 +204,78 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
             : [];
 
         for (const upload of nonClassPendingUploads) {
-            console.log(`Cleaning up non-Class pending upload: ${upload.payload.category}`);
-            // FIX: Use the instance method
             await practiceDatabase.removePendingUpload(upload.id);
         }
 
-        await checkPendingUploads(); // Update count after processing
+        await checkPendingUploads();
     }, [checkPendingUploads]);
+    
+    // Initial Submit (or Retry from UI)
+    const handleSubmitData = async (code: string, data: PracticeDataPayload) => {
+        if (!requiresDataSubmission(data.category)) {
+            console.log(`Skipping submission for non-Class category: ${data.category}`);
+            setSubmissionStatus('success');
+            return;
+        }
+
+        if (submissionStatus === 'initial' && !code.trim()) {
+            console.warn("Registration code is required.");
+            return;
+        }
+
+        setIsSubmitting(true);
+        setSubmissionError(''); // Clear previous errors
+        const finalPayload = { ...data, registrationCode: code.trim() || null };
+
+        try {
+            const result = await uploadPracticeData(finalPayload); // Get the structured result
+
+            if (result.success) {
+                // SUCCESS - Remove any old pending state if it exists (though unlikely for a new submission)
+                const existingPending = await practiceDatabase.getPendingUploads() as PendingUpload[];
+                const currentSessionPending = existingPending.find(p => 
+                    p.payload.startTime.getTime() === data.startTime.getTime() && 
+                    p.payload.category === data.category
+                );
+                if (currentSessionPending) {
+                    await practiceDatabase.removePendingUpload(currentSessionPending.id);
+                    console.log('Successfully submitted and removed corresponding pending upload.');
+                }
+                setSubmissionStatus('success');
+            } else if (result.isUnauthorized) {
+                // If UNAUTHORIZED, DO NOT PERSIST, and REMOVE any existing pending upload for this session
+                const existingPending = await practiceDatabase.getPendingUploads() as PendingUpload[];
+                const currentSessionPending = existingPending.find(p => 
+                    p.payload.startTime.getTime() === data.startTime.getTime() && 
+                    p.payload.category === data.category
+                );
+                if (currentSessionPending) {
+                    await practiceDatabase.removePendingUpload(currentSessionPending.id);
+                    await checkPendingUploads(); // Update count immediately
+                    console.warn('Unauthorized code used. Removed corresponding pending upload to stop retries.');
+                }
+                
+                setSubmissionStatus('unauthorized');
+                setSubmissionError(result.errorMessage || "Registration code not recognized.");
+            } else {
+                // General Server/Network Failure -> Persist locally
+                await practiceDatabase.addPendingUpload(finalPayload);
+                setSubmissionStatus('persisted');
+                await checkPendingUploads();
+            }
+        } catch (error) {
+            console.error('Submission failed due to network error:', error);
+            // Network error -> Persist locally
+            await practiceDatabase.addPendingUpload(finalPayload);
+            setSubmissionStatus('persisted');
+            await checkPendingUploads();
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
 
     useEffect(() => {
-        // If sessionData already has a code (e.g., passed from a previous login state), use it.
         if (sessionData.registrationCode && submissionStatus === 'initial') {
             setRegistrationCode(sessionData.registrationCode);
         }
@@ -246,6 +289,8 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
         return () => clearInterval(retryInterval);
     }, [sessionData, checkPendingUploads, processPendingUploads, submissionStatus]);
 
+    // 3. UPDATED renderSubmissionContent function
+    // This is defined before it's used in renderCompletionMessage
     const renderSubmissionContent = () => {
         const isSubmitDisabled = isSubmitting || !registrationCode.trim();
 
@@ -256,6 +301,41 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
                         <CheckCircle className="h-14 w-14 text-green-500 mx-auto" />
                         <h3 className="text-2xl font-bold text-green-700">Data Submitted Successfully!</h3>
                         <p className="text-gray-600 max-w-sm mx-auto">Your practice data has been securely logged on the server.</p>
+                    </div>
+                );
+            case 'unauthorized':
+                return (
+                    <div className="space-y-6">
+                        <div className="text-center space-y-4">
+                            <AlertTriangle className="h-14 w-14 text-red-600 mx-auto" />
+                            <h3 className="text-2xl font-bold text-red-700">Submission Failed!</h3>
+                            <p className="text-red-500 font-semibold max-w-sm mx-auto">
+                                {submissionError || "The registration code was not recognized. Please re-enter a valid code to submit this session."}
+                            </p>
+                        </div>
+                        {/* Input field for re-entry */}
+                        <Input
+                            id="reg-code-retry"
+                            type="text"
+                            value={registrationCode}
+                            onChange={(e) => {
+                                setRegistrationCode(e.target.value);
+                                // Reset status back to 'initial' when the user starts typing
+                                setSubmissionStatus('initial');
+                                setSubmissionError('');
+                            }}
+                            placeholder="Enter corrected code"
+                            className="text-lg p-3 w-full border-red-400 focus:border-red-600"
+                            disabled={isSubmitting}
+                        />
+                        <Button
+                            onClick={() => handleSubmitData(registrationCode, fixedSessionData)}
+                            disabled={isSubmitDisabled}
+                            className="w-full text-lg py-3 bg-red-600 hover:bg-red-700"
+                            size="lg"
+                        >
+                            {isSubmitting ? 'Resubmitting...' : 'Resubmit with New Code'}
+                        </Button>
                     </div>
                 );
             case 'failed':
@@ -305,18 +385,19 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
                 );
         }
     };
-
+    
+    // The function that was causing the error, now properly defined here.
     const renderCompletionMessage = () => {
         if (currentCategoryRequiresSubmission) {
             return (
                 <>
-                    {/* DATA SUBMISSION & STATUS - Added p-8 for better spacing */}
+                    {/* DATA SUBMISSION & STATUS */}
                     <div className="p-8 bg-gray-50 rounded-xl border border-gray-200 shadow-inner">
                         {renderSubmissionContent()}
                     </div>
 
-                    {/* Pending Upload Indicator */}
-                    {pendingUploadCount > 0 && submissionStatus !== 'success' && (
+                    {/* Pending Upload Indicator (Only shown if NOT success/unauthorized) */}
+                    {pendingUploadCount > 0 && submissionStatus !== 'success' && submissionStatus !== 'unauthorized' && (
                         <div className="text-center text-sm text-orange-600 flex items-center justify-center gap-2 mt-4">
                             <Repeat2 className="h-4 w-4 animate-spin-slow" />
                             {pendingUploadCount} Class submission{pendingUploadCount > 1 ? 's' : ''} pending and will be retried automatically.
@@ -345,10 +426,8 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
     };
 
     return (
-        // Adjusted padding for better vertical spacing on desktop
         <div className="min-h-screen bg-gray-50">
             <main className="max-w-4xl mx-auto px-4 py-8 md:py-12 lg:py-20">
-                {/* Card: Added subtle shadow and increased rounded corners */}
                 <Card className="p-6 sm:p-10 space-y-8 sm:space-y-10 rounded-xl shadow-2xl">
                     <div className="text-center space-y-4">
                         <CheckCircle className="h-16 w-16 text-indigo-600 mx-auto" />
@@ -368,10 +447,9 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
 
                     <hr className="border-gray-200" />
 
-                    {/* STATS SUMMARY - THE MAIN LAYOUT FIX */}
+                    {/* STATS SUMMARY */}
                     <div className="space-y-4">
                         <h2 className="text-2xl font-bold text-gray-800 text-center">Performance Summary</h2>
-                        {/* KEY FIX: grid-cols-1 on mobile, expands to grid-cols-2 on small screens (sm:) and up */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <StatItem label="Questions Completed" value={stats.totalQuestionsCompleted} />
                             <StatItem label="Time Spent (min)" value={(fixedSessionData.totalTimeSeconds / 60).toFixed(1)} />
