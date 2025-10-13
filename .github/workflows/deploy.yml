@@ -29,8 +29,11 @@ jobs:
           NEXT_PUBLIC_GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
           NEXT_PUBLIC_GOOGLE_PRACTICE_SHEET_ID: ${{ secrets.GOOGLE_PRACTICE_SHEET_ID }}
           NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID: ${{ secrets.GOOGLE_TEST_SHEET_ID }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
           NEXT_PUBLIC_GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
+          NEXT_PUBLIC_GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
         run: |
           # The secrets are available in the shell environment when npm run build runs
           npm install --force
