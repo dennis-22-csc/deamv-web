@@ -182,7 +182,7 @@ const NotebookUploadDialog: React.FC<NotebookUploadDialogProps> = ({
                     name="registrationCode"
                     value={formData.registrationCode}
                     onChange={handleChange}
-                    placeholder="Enter your student registration code"
+                    placeholder="Enter your registration code"
                     maxLength={100}
                 />
                 

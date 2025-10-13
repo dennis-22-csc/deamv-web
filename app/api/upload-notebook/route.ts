@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { notebookProcessor, isNotebookProcessorConfigured } from '@/lib/notebookprocessor';
 import authorizedStudents from '@/data/authorized_students.json';
 
+// Define the Mentor Registration Codes
+const MENTOR_REG_CODES = [
+    '8272025-101001', 
+    '8282025-111002'
+];
 
 async function sendNotebookGroupNotification(messageText: string) {
     const whatsappUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL;
@@ -70,16 +75,40 @@ export async function POST(req: NextRequest) {
                 { status: 403 } 
             );
         }
+
+        // --- NEW LOGIC: Determine if the user is a Mentor ---
+        const isMentor = MENTOR_REG_CODES.includes(trimmedCode);
         
-        // 3. Perform the server-side upload operation
-        const result = await notebookProcessor.processAndUploadNotebook(data);
+        // 3. Prepare data for the processor (including the role for folder determination)
+        const uploadData = {
+            ...data, // Contains firstName, lastName, className, notebookUrl
+            registrationCode: trimmedCode, // Ensure trimmed code is used
+            isMentor: isMentor
+        };
+        
+        // 4. Perform the server-side upload operation
+        const result = await notebookProcessor.processAndUploadNotebook(uploadData);
 
         if (result.success) {
-            // 4. Send Group Notification on Success
+            // 5. Send Group Notification on Success
             try {
-                // Use the name provided by the JSON for notification clarity/consistency
                 const notificationName = authorizedStudentName || `${firstName} ${lastName}`; 
-                const notificationMessage = `New Colab notebook Submission: ${notificationName} (${trimmedCode}) submitted for ${className}. Others should follow suite!`; 
+                const role = isMentor ? 'Mentor' : 'Student';
+                let notificationMessage;
+                const trimmedNotificationName = notificationName.trim();
+                const trimmedClassName = className.trim();
+
+
+                // New Line with Zero-Width Space before the URL
+                const zwsp = '\u200b';
+
+                if (isMentor) {
+                  // Note the structure: Newline, then the ZWSP, then the URL
+                  notificationMessage = `Mentor *${trimmedNotificationName}* has uploaded colab notebook for *${trimmedClassName}*, check it out using the below link!\n\n${zwsp}${notebookUrl}`;
+                } else {
+                  // Student message (no URL, should work fine)
+                  notificationMessage = `New Colab notebook Submission by *${trimmedNotificationName}* for *${trimmedClassName}*. Others who havent submitted theirs should follow suit!`;
+                }
                 
                 await sendNotebookGroupNotification(notificationMessage);
                 

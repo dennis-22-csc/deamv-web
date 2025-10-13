@@ -51,8 +51,7 @@ export default function NotebookUploadPage() {
             setIsDialogOpen(true);
         }
         
-        // If it was a success, leave the dialog closed (default behavior)
-        // If it was 'Processing...' we shouldn't reach here (it should be replaced by success/fail).
+        
     };
 
     // Function to handle the data submitted from the Dialog

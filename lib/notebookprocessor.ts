@@ -1,12 +1,16 @@
+// lib/notebookprocessor
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library'; 
 import axios from 'axios';
+import { Stream } from 'stream'; 
 
 export interface NotebookUploadData {
     firstName: string;
     lastName: string;
     className: string;
     notebookUrl: string;
+    registrationCode: string; 
+    isMentor?: boolean; 
 }
 
 export interface UploadResult {
@@ -21,7 +25,7 @@ export interface GoogleDriveConfig {
     clientId: string;
     clientSecret: string;
     refreshToken: string;
-    targetFolderId: string;
+    targetFolderId: string; 
 }
 
 
@@ -36,7 +40,7 @@ class NotebookProcessor {
         this.config = config;
         this.initializeDrive();
     }
-
+    
     private initializeDrive() {
         const { clientId, clientSecret, refreshToken } = this.config;
 
@@ -64,14 +68,12 @@ class NotebookProcessor {
         this.drive = google.drive({ version: 'v3', auth: oAuth2Client });
     }
     
-    
     private extractFileId(url: string): string | null {
         const match = url.match(/id=([a-zA-Z0-9_-]+)|drive\/([a-zA-Z0-9_-]+)/);
         return match ? (match[1] || match[2]) : null;
     }
+    // ...
 
-    
-    
     private async downloadNotebookContent(fileId: string): Promise<string> {
         if (!this.drive) {
             throw new Error("Drive client not initialized. Check OAuth configuration.");
@@ -95,11 +97,10 @@ class NotebookProcessor {
         return notebookContent;
     }
 
-    
     private createNewFilename(data: NotebookUploadData): string {
         const cleanedFirstName = data.firstName.replace(/\s/g, '');
         const cleanedLastName = data.lastName.replace(/\s/g, '');
-
+        
         const classMatch = data.className.match(/Class\s*\d+/i);
         let classIdentifier = '';
 
@@ -109,10 +110,9 @@ class NotebookProcessor {
             console.warn(`⚠️ Could not find 'Class X' format in class name: ${data.className}. Using generic clean.`);
             classIdentifier = data.className.replace(/[^a-zA-Z0-9]/g, '');
         }
-
+        
         return `${cleanedFirstName}_${cleanedLastName}_${classIdentifier}.ipynb`;
     }
-    
     
     private extractClassFolderName(className: string): string {
         const match = className.match(/Class\s*\d+/i);
@@ -122,7 +122,7 @@ class NotebookProcessor {
         return "Unsorted Notebooks";
     }
 
-   
+    
     private async findOrCreateSubfolder(parentFolderId: string, folderName: string): Promise<string> {
         const searchResponse = await this.drive.files.list({
             q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and '${parentFolderId}' in parents and trashed=false`,
@@ -131,11 +131,11 @@ class NotebookProcessor {
 
         if (searchResponse.data.files && searchResponse.data.files.length > 0) {
             const folderId = searchResponse.data.files[0].id;
-            console.log(`🔍 [NotebookProcessor] Found existing folder for '${folderName}': ${folderId}`);
+            // console.log(`🔍 [NotebookProcessor] Found existing folder for '${folderName}': ${folderId}`);
             return folderId;
         }
 
-        console.log(`⚠️ [NotebookProcessor] Folder for '${folderName}' not found. Creating new folder...`);
+        console.log(`⚠️ [NotebookProcessor] Folder for '${folderName}' not found in parent ${parentFolderId}. Creating new folder...`);
         const createResponse = await this.drive.files.create({
             requestBody: {
                 name: folderName,
@@ -148,6 +148,23 @@ class NotebookProcessor {
         const newFolderId = createResponse.data.id;
         console.log(`✅ [NotebookProcessor] Created new folder: ${newFolderId}`);
         return newFolderId;
+    }
+
+   
+    private async findExistingFile(folderId: string, fileName: string): Promise<string | null> {
+        const q = `name='${fileName}' and '${folderId}' in parents and trashed=false`;
+        
+        const response = await this.drive.files.list({
+            q: q,
+            fields: 'files(id, name)',
+            spaces: 'drive',
+        });
+        
+        if (response.data.files && response.data.files.length > 0) {
+            console.log(`🔍 [NotebookProcessor] Found existing file: ${response.data.files[0].id}`);
+            return response.data.files[0].id;
+        }
+        return null;
     }
 
 
@@ -172,36 +189,74 @@ class NotebookProcessor {
         const newFileName = this.createNewFilename(data);
 
         try {
+            // 1. Determine the root type folder (Mentors or Students)
+            const roleFolderName = data.isMentor ? 'Mentors' : 'Students';
+            
+            // 2. Find/Create the Role Folder within the main targetFolderId
+            const roleFolderId = await this.findOrCreateSubfolder(
+                this.config.targetFolderId, 
+                roleFolderName
+            );
+
+            // 3. Determine the class folder name
             const classFolderName = this.extractClassFolderName(data.className);
             
-            const subFolderId = await this.findOrCreateSubfolder(
-                this.config.targetFolderId,  
+            // 4. Find/Create the Class Folder within the Role Folder
+            const targetParentFolderId = await this.findOrCreateSubfolder(
+                roleFolderId,
                 classFolderName
             );
             
+            // 5. Download the notebook content
             const notebookContent = await this.downloadNotebookContent(fileId);
             
-            console.log(`🔍 [NotebookProcessor] Uploading content as: ${newFileName} to subfolder ${subFolderId} ('${classFolderName}')`);
+            // 6. Check for existing file
+            const existingFileId = await this.findExistingFile(targetParentFolderId, newFileName);
+            
+            let uploadedFile;
+            let operationMessage;
+            
+            // Convert content string to a stream for uploading
+            const contentStream = new Stream.Readable();
+            contentStream.push(notebookContent);
+            contentStream.push(null);
 
-            const response = await this.drive.files.create({
-                requestBody: {
-                    name: newFileName,
-                    mimeType: 'application/x-ipynb+json',
-                    parents: [subFolderId],
-                },
-                media: {
-                    mimeType: 'application/x-ipynb+json',
-                    body: notebookContent,
-                },
-            });
+            if (existingFileId) {
+                // UPDATE existing file
+                console.log(`🔄 [NotebookProcessor] Updating existing file: ${existingFileId}`);
+                const updateResponse = await this.drive.files.update({
+                    fileId: existingFileId,
+                    media: {
+                        mimeType: 'application/x-ipynb+json',
+                        body: contentStream,
+                    },
+                });
+                uploadedFile = updateResponse.data;
+                operationMessage = `Notebook successfully updated as ${newFileName} in ${classFolderName} folder.`;
 
-            const uploadedFile = response.data;
+            } else {
+                // CREATE new file
+                console.log(`⬆️ [NotebookProcessor] Creating new file: ${newFileName}`);
+                const createResponse = await this.drive.files.create({
+                    requestBody: {
+                        name: newFileName,
+                        mimeType: 'application/x-ipynb+json',
+                        parents: [targetParentFolderId],
+                    },
+                    media: {
+                        mimeType: 'application/x-ipynb+json',
+                        body: contentStream,
+                    },
+                });
+                uploadedFile = createResponse.data;
+                operationMessage = `Notebook successfully uploaded as ${newFileName} into ${classFolderName} folder.`;
+            }
 
-            console.log(`✅ [NotebookProcessor] Upload successful! File ID: ${uploadedFile.id}`);
+            console.log(`✅ [NotebookProcessor] Operation successful! File ID: ${uploadedFile.id}`);
 
             return {
                 success: true,
-                message: `Notebook successfully uploaded as ${newFileName} into ${classFolderName} folder.`,
+                message: operationMessage,
                 fileName: newFileName,
                 fileId: uploadedFile.id,
             };
@@ -219,6 +274,7 @@ class NotebookProcessor {
         }
     }
 } 
+
 
 export const NOTEBOOK_FOLDER_ID = process.env.NEXT_PUBLIC_NOTEBOOK_FOLDER_ID;
 
