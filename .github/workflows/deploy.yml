@@ -34,6 +34,7 @@ jobs:
           NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
           NEXT_PUBLIC_GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           NEXT_PUBLIC_GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          NEXT_PUBLIC_NOTEBOOK_FOLDER_ID: ${{ secrets.NOTEBOOK_FOLDER_ID }}
         run: |
           # The secrets are available in the shell environment when npm run build runs
           npm install --force
