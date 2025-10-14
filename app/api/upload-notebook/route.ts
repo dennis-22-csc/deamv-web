@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
                   notificationMessage = `New Colab notebook Submission by *${trimmedNotificationName}* for *${trimmedClassName}*. Others who havent submitted theirs should follow suit!`;
                 }
                 
-                await sendNotebookGroupNotification(notificationMessage);
+                //await sendNotebookGroupNotification(notificationMessage);
                 
             } catch (notificationError) {
                 console.error('Failed to send group notification (Non-critical error):', notificationError);

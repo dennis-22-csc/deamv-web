@@ -86,7 +86,7 @@ export async function POST(request: Request) {
             if (submissionResult.success) {
                 console.log('✅ [SubmitQuiz API] Successfully submitted to Google Sheets');
                 
-                sendGroupNotification(studentName, quizName);
+                //sendGroupNotification(studentName, quizName);
                 
                 return NextResponse.json({
                     success: true,

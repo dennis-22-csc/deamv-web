@@ -197,7 +197,7 @@ export async function POST(request: Request) {
 
             // --- 3. WHATSAPP NOTIFICATION ---
             // Send the notification after successful data logging (Fire and forget)
-            sendGroupNotification(studentName, category);
+            //sendGroupNotification(studentName, category);
 
             return NextResponse.json({
                 success: true,
