@@ -1,27 +1,30 @@
+// app/category-selection/page.tsx
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, ArrowLeft } from 'lucide-react';
+import { Play, ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
-import { FileLoadDialog } from '@/components/dialogs/FileLoadDialog';
-import { ProgressDialog } from '@/components/dialogs/ProgressDialog';
+import { Progress } from '@/components/ui/Progress';
 import { practiceDatabase } from '@/lib/database';
-import { processTxtFile } from '@/lib/fileProcessor';
+
+const SHOULD_REFETCH_ALWAYS = process.env.NEXT_PUBLIC_NEW_PRACTICE_QUESTIONS_AVAILABLE === 'true';
 
 interface CategorySelectionState {
   selectedCategory: string;
   categories: string[];
   hasLoadedQuestions: boolean;
   isLoading: boolean;
-  isProcessingFile: boolean;
-  showFileLoadDialog: boolean;
-  selectedFile: File | null;
-  processingResult: {
+  isDownloading: boolean;
+  downloadProgress: number;
+  downloadResult: {
     success: boolean;
     message: string;
+    totalProcessed: number;
+    totalFailed: number;
+    categoriesFound: string[];
   } | null;
 }
 
@@ -31,25 +34,18 @@ export default function CategorySelectionPage() {
     categories: ['General'],
     hasLoadedQuestions: false,
     isLoading: true,
-    isProcessingFile: false,
-    showFileLoadDialog: false,
-    selectedFile: null,
-    processingResult: null,
+    isDownloading: false,
+    downloadProgress: 0,
+    downloadResult: null,
   });
 
   const router = useRouter();
 
   // Load initial data
-  useEffect(() => {
-    loadInitialData();
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.txt,.csv,text/plain';
-    (window as any).fileInput = fileInput;
-  }, []);
-
   const loadInitialData = useCallback(async () => {
     try {
+      console.log('🔍 [CategorySelection] Loading initial data...');
+      
       const [hasQuestions, categories] = await Promise.all([
         practiceDatabase.hasDataScienceChallenges(),
         practiceDatabase.getAllCategories(),
@@ -57,161 +53,293 @@ export default function CategorySelectionPage() {
 
       const allCategories = ['General', ...categories.filter(cat => cat !== 'General')];
       
+      console.log(`✅ [CategorySelection] Initial data loaded - Has questions: ${hasQuestions}, Categories: ${allCategories.length}`);
+      
       setState(prev => ({
         ...prev,
         hasLoadedQuestions: hasQuestions,
         categories: allCategories,
         isLoading: false,
-        showFileLoadDialog: !hasQuestions, 
       }));
+      
+      // Return the current state of questions for the useEffect logic
+      return hasQuestions; 
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      console.error('❌ [CategorySelection] Error loading initial data:', error);
       setState(prev => ({ ...prev, isLoading: false }));
+      return false; // Indicate failure
     }
   }, []);
 
-  // --- File Handling Functions ---
+  /**
+   * Clear existing questions before saving new ones
+   */
+  const clearExistingQuestions = useCallback(async () => {
+    try {
+      console.log('🗑️ [CategorySelection] Clearing existing questions...');
+      await practiceDatabase.clearDataScienceChallenges();
+      console.log('✅ [CategorySelection] Existing questions cleared');
+      return true;
+    } catch (error) {
+      console.error('❌ [CategorySelection] Error clearing existing questions:', error);
+      return false;
+    }
+  }, []);
 
   /**
-   * Process file immediately when selected and persist to database
+   * Save questions to client-side storage
    */
-  const processFileImmediately = useCallback(async (file: File) => {
-    console.log('🚀 [pages.tsx] processFileImmediately called with file:', file.name);
+  const saveQuestionsToStorage = useCallback(async (questions: any[]) => {
+    console.log('💾 [CategorySelection] Saving questions to client storage:', questions.length);
+    
+    let savedCount = 0;
+    let failedCount = 0;
+
+    // Process questions in batches to avoid overwhelming the storage
+    const batchSize = 5;
+    for (let i = 0; i < questions.length; i += batchSize) {
+      const batch = questions.slice(i, i + batchSize);
+      
+      // Process each question in the batch
+      for (const question of batch) {
+        try {
+          console.log(`💾 [CategorySelection] Saving question ${savedCount + 1}/${questions.length}`);
+          
+          await practiceDatabase.addDataScienceChallenge(
+            question.Question,
+            question.Answer,
+            question.Category
+          );
+          savedCount++;
+          
+          // Update progress for each question saved
+          const progress = 80 + Math.floor((savedCount / questions.length) * 20);
+          setState(prev => ({ ...prev, downloadProgress: progress }));
+          
+        } catch (error) {
+          console.error(`❌ [CategorySelection] Failed to save question:`, error);
+          failedCount++;
+        }
+      }
+      
+      // Small delay between batches to prevent overwhelming the storage
+      if (i + batchSize < questions.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`✅ [CategorySelection] Storage result: ${savedCount} saved, ${failedCount} failed`);
+    return { saved: savedCount, failed: failedCount };
+  }, []);
+
+  /**
+   * Download practice questions via API route and save to client storage
+   */
+  const downloadPracticeQuestions = useCallback(async () => {
+    console.log('🚀 [CategorySelection] Starting practice questions download via API...');
     
     setState(prev => ({ 
       ...prev, 
-      isProcessingFile: true, 
-      selectedFile: file,
-      processingResult: null,
+      isDownloading: true,
+      downloadProgress: 0,
+      downloadResult: null,
     }));
 
     try {
-      console.log('🔍 [pages.tsx] Calling processTxtFile for immediate persistence...');
-      const result = await processTxtFile(file, 'data_science');
-      console.log('🔍 [pages.tsx] Immediate file processing result:', result);
+      // Initial progress - starting download
+      setState(prev => ({ ...prev, downloadProgress: 10 }));
       
-      // Update state with processing result
-      setState(prev => ({
-        ...prev,
-        isProcessingFile: false,
-        processingResult: {
-          success: result.success,
-          message: result.message,
-        },
-      }));
+      // Step 1: Clear existing questions before downloading new ones
+      console.log('🗑️ [CategorySelection] Clearing existing questions before download...');
+      setState(prev => ({ ...prev, downloadProgress: 20 }));
+      
+      const clearSuccess = await clearExistingQuestions();
+      if (!clearSuccess) {
+        throw new Error('Failed to clear existing questions');
+      }
+      
+      // Step 2: Download new questions
+      console.log('🔍 [CategorySelection] Calling practice questions API...');
+      setState(prev => ({ ...prev, downloadProgress: 40 }));
+      
+      const response = await fetch('/api/practice-questions');
+      
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
 
-      if (result.success) {
-        console.log('✅ [pages.tsx] File persisted successfully, reloading initial data...');
+      // Progress update - data received
+      setState(prev => ({ ...prev, downloadProgress: 60 }));
+
+      console.log('🔍 [CategorySelection] API response:', {
+        success: result.success,
+        questionCount: result.questions?.length,
+        error: result.error
+      });
+
+      if (result.success && result.questions && result.questions.length > 0) {
+        console.log('🔍 [CategorySelection] Saving questions to client storage...');
+        
+        // Save questions to client-side storage
+        const storageResult = await saveQuestionsToStorage(result.questions);
+        
+        console.log('✅ [CategorySelection] Storage completed:', storageResult);
+
+        setState(prev => ({
+          ...prev,
+          isDownloading: false,
+          downloadResult: {
+            success: storageResult.failed === 0,
+            message: storageResult.failed === 0 
+              ? `Successfully downloaded and saved ${storageResult.saved} questions`
+              : `Downloaded ${result.questions.length} questions (${storageResult.saved} saved, ${storageResult.failed} failed)`,
+            totalProcessed: storageResult.saved,
+            totalFailed: storageResult.failed,
+            categoriesFound: result.categoriesFound || [],
+          },
+        }));
+
+        console.log('✅ [CategorySelection] Files processed successfully, reloading initial data...');
         // Reload categories and update hasLoadedQuestions
         await loadInitialData();
-        
-        // Show success message
-        alert(`Success! ${result.message}`);
       } else {
-        console.error('❌ [pages.tsx] File processing failed:', result.message);
-        alert(`Error processing file: ${result.message}`);
+        setState(prev => ({ ...prev, downloadProgress: 100 }));
+        
+        const errorMessage = result.error 
+          ? `Download failed: ${result.error}`
+          : 'Download failed - no questions received from server';
+        
+        setState(prev => ({
+          ...prev,
+          isDownloading: false,
+          downloadResult: {
+            success: false,
+            message: errorMessage,
+            totalProcessed: 0,
+            totalFailed: result.questions?.length || 0,
+            categoriesFound: result.categoriesFound || [],
+          },
+        }));
+        console.error('❌ [CategorySelection] API download failed:', result.error);
       }
 
     } catch (error) {
-      console.error('❌ [pages.tsx] Critical error during file processing:', error);
+      console.error('❌ [CategorySelection] Critical error during API call:', error);
       setState(prev => ({ 
         ...prev, 
-        isProcessingFile: false,
-        processingResult: {
+        isDownloading: false,
+        downloadProgress: 100,
+        downloadResult: {
           success: false,
-          message: 'A critical error occurred during file processing.',
+          message: error instanceof Error ? error.message : 'A critical error occurred during download.',
+          totalProcessed: 0,
+          totalFailed: 0,
+          categoriesFound: [],
         },
       }));
-      alert('A critical error occurred during file processing. Please try again.');
     }
-  }, [loadInitialData]);
+  }, [loadInitialData, saveQuestionsToStorage, clearExistingQuestions]);
 
-  const handleFileCapture = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    
-    if (file) {
-      console.log('🔍 [pages.tsx] File selected, starting immediate processing...');
-      // Process file immediately when selected
-      processFileImmediately(file);
-      setState(prev => ({ 
-        ...prev, 
-        showFileLoadDialog: false,
-      }));
-    } else {
-      handleFileLoadCancelled();
-    }
-    target.value = '';
+  // FIX: Modify useEffect to respect the environment variable
+  useEffect(() => {
+    const initializePage = async () => {
+      // 1. Load initial data (check if questions exist)
+      const hasQuestions = await loadInitialData();
+      
+      // 2. Determine if automatic download is needed
+      const shouldAutoDownload = SHOULD_REFETCH_ALWAYS || !hasQuestions;
+
+      if (shouldAutoDownload) {
+        console.log(`⚠️ [CategorySelection] Auto-downloading questions because: ${SHOULD_REFETCH_ALWAYS ? 'New questions flag is TRUE' : 'No local questions found'}`);
+        await downloadPracticeQuestions();
+      } else {
+        console.log('✅ [CategorySelection] Questions found locally and no forced update. Ready to practice.');
+      }
+    };
+
+    initializePage();
+  }, [loadInitialData, downloadPracticeQuestions]); // Dependencies remain correct
+  // END FIX
+
+  /**
+   * Handle initial download click
+   */
+  const handleInitialDownloadClick = () => {
+    downloadPracticeQuestions();
   };
 
-  const handleOpenFilePicker = () => {
-    const fileInput = (window as any).fileInput || document.createElement('input');
-    fileInput.onchange = handleFileCapture;
-    fileInput.click();
+  /**
+   * Retry download if previous attempt failed
+   */
+  const handleRetryDownload = () => {
+    downloadPracticeQuestions();
   };
 
-  // --- Other Functions ---
+  /**
+   * Clear download result and reset state
+   */
+  const handleClearDownload = () => {
+    setState(prev => ({
+      ...prev,
+      downloadResult: null,
+    }));
+  };
 
+  /**
+   * Handle category change
+   */
   const handleCategoryChange = (category: string) => {
     setState(prev => ({ ...prev, selectedCategory: category }));
   };
 
+  /**
+   * Start practice session
+   */
   const handleStartPractice = async () => {
-    router.push(`/practice?category=${encodeURIComponent(state.selectedCategory)}`);
-  };
-
-  const handleFileLoadCancelled = () => {
-    setState(prev => ({ 
-      ...prev, 
-      showFileLoadDialog: false, 
-      selectedFile: null,
-      processingResult: null,
-    }));
-    
-    // Only redirect if no questions are loaded and user cancels file selection
     if (!state.hasLoadedQuestions) {
-      router.push('/');
+      console.error('❌ [CategorySelection] Cannot start practice - no questions loaded');
+      return;
+    }
+    
+    try {
+      // Verify we have questions for the selected category
+      const categoryQuestions = await practiceDatabase.getDataScienceChallengesByCategory(state.selectedCategory);
+      
+      if (categoryQuestions.length === 0) {
+        console.warn(`⚠️ [CategorySelection] No questions found for category: ${state.selectedCategory}`);
+        // Still navigate - the practice page will handle empty state
+      }
+      
+      console.log(`🚀 [CategorySelection] Starting practice for category: ${state.selectedCategory}`);
+      router.push(`/practice?category=${encodeURIComponent(state.selectedCategory)}`);
+    } catch (error) {
+      console.error('❌ [CategorySelection] Error starting practice:', error);
     }
   };
 
   /**
-   * Handle file selection from dialog - process immediately
+   * Clear all questions and reset to initial state
    */
-  const handleFileLoadConfirmed = (fileFromDialog?: File) => {
-    setState(prev => ({ ...prev, showFileLoadDialog: false })); 
-
-    if (fileFromDialog) {
-      console.log('🔍 [pages.tsx] File from dialog, starting immediate processing...');
-      // Process file immediately when selected via drag-and-drop
-      processFileImmediately(fileFromDialog);
-    } else {
-      // Clicked 'Open File Browser': trigger picker (which will process immediately)
-      handleOpenFilePicker();
+  const handleClearAllQuestions = async () => {
+    try {
+      console.log('🗑️ [CategorySelection] Clearing all questions...');
+      await practiceDatabase.clearDataScienceChallenges();
+      
+      // Reset state
+      setState(prev => ({
+        ...prev,
+        hasLoadedQuestions: false,
+        categories: ['General'],
+        selectedCategory: 'General',
+        downloadResult: null,
+      }));
+      
+      console.log('✅ [CategorySelection] All questions cleared');
+    } catch (error) {
+      console.error('❌ [CategorySelection] Error clearing questions:', error);
     }
-  };
-  
-  const handleInitialLoadClick = () => {
-    setState(prev => ({ ...prev, showFileLoadDialog: true }));
-  };
-
-  /**
-   * Retry processing if previous attempt failed
-   */
-  const handleRetryProcessing = () => {
-    if (state.selectedFile) {
-      processFileImmediately(state.selectedFile);
-    }
-  };
-
-  /**
-   * Clear current file selection and result
-   */
-  const handleClearFile = () => {
-    setState(prev => ({
-      ...prev,
-      selectedFile: null,
-      processingResult: null,
-    }));
   };
 
   if (state.isLoading) {
@@ -224,7 +352,7 @@ export default function CategorySelectionPage() {
       </div>
     );
   }
-    
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -244,6 +372,7 @@ export default function CategorySelectionPage() {
                 Practice Categories
               </h1>
             </div>
+            
           </div>
         </div>
       </header>
@@ -258,7 +387,7 @@ export default function CategorySelectionPage() {
                 Select Practice Category
               </h2>
               <p className="text-gray-600">
-                Choose a category or upload a file to start your practice session
+                Choose a category to start your practice session. Questions are automatically loaded from our question bank.
               </p>
             </div>
 
@@ -275,66 +404,82 @@ export default function CategorySelectionPage() {
               />
               
               {/* Conditional Button based on state */}
-              {state.isProcessingFile ? (
-                // 1. PROCESSING: Show processing state
-                <div className="text-center space-y-2">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-sm text-gray-600">
-                    Processing file: {state.selectedFile?.name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Please wait while we save your questions...
-                  </p>
+              {state.isDownloading ? (
+                // 1. DOWNLOADING: Show download progress
+                <div className="text-center space-y-4">
+                  <Loader2 className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Downloading practice questions...</span>
+                      <span>{state.downloadProgress}%</span>
+                    </div>
+                    <Progress value={state.downloadProgress} className="h-2" />
+                    <p className="text-xs text-gray-500">
+                      {state.downloadProgress < 20 ? 'Clearing existing questions...' :
+                       state.downloadProgress < 60 ? 'Fetching from Google Drive...' : 
+                       state.downloadProgress < 80 ? 'Processing questions...' : 
+                       'Saving to local storage...'}
+                    </p>
+                  </div>
                 </div>
-              ) : state.processingResult ? (
-                // 2. PROCESSING COMPLETE: Show result and next steps
+              ) : state.downloadResult ? (
+                // 2. DOWNLOAD COMPLETE: Show result and next steps
                 <div className="text-center space-y-3">
                   <div className={`p-3 rounded-lg ${
-                    state.processingResult.success 
+                    state.downloadResult.success 
                       ? 'bg-green-50 text-green-800 border border-green-200' 
                       : 'bg-red-50 text-red-800 border border-red-200'
                   }`}>
-                    <p className="font-medium">{state.processingResult.message}</p>
+                    <p className="font-medium">{state.downloadResult.message}</p>
+                    {state.downloadResult.totalFailed > 0 && (
+                      <p className="text-sm mt-1 text-amber-700">
+                        {state.downloadResult.totalFailed} questions failed to save
+                      </p>
+                    )}
                   </div>
                   
-                  {state.processingResult.success ? (
-                    // Success: Show practice button
+                  {state.downloadResult.success || state.downloadResult.totalProcessed > 0 ? (
+                    // Success or partial success: Show practice button
                     <div className="space-y-2">
                       <Button
                         onClick={handleStartPractice}
                         className="w-full flex items-center justify-center gap-2"
                         size="lg"
+                        disabled={!state.hasLoadedQuestions}
                       >
                         <Play className="h-5 w-5" />
                         Start Practice
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={handleClearFile}
-                        className="w-full"
-                        size="sm"
-                      >
-                        Load Different File
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleRetryDownload}
+                          className="flex-1"
+                          size="sm"
+                        >
+                          <Download className="h-4 w-4" />
+                          Refetch Questions
+                        </Button>
+                      </div>
                     </div>
                   ) : (
-                    // Failure: Show retry options
+                    // Complete failure: Show retry options
                     <div className="space-y-2">
                       <Button
-                        onClick={handleRetryProcessing}
+                        onClick={handleRetryDownload}
                         className="w-full flex items-center justify-center gap-2"
                         size="lg"
                       >
-                        <Play className="h-5 w-5" />
-                        Retry Processing
+                        <Download className="h-5 w-5" />
+                        Retry Download
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={handleClearFile}
+                        onClick={handleClearDownload}
                         className="w-full"
                         size="sm"
                       >
-                        Try Different File
+                        Try Again
                       </Button>
                     </div>
                   )}
@@ -350,68 +495,80 @@ export default function CategorySelectionPage() {
                     <Play className="h-5 w-5" />
                     Start Practice
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleInitialLoadClick}
-                    className="w-full"
-                    size="sm"
-                  >
-                    Load New Questions File
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleInitialDownloadClick}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <Download className="h-4 w-4" />
+                      Reload Questions
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleClearAllQuestions}
+                      className="flex-1 text-red-600 hover:text-red-700"
+                      size="sm"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                // 4. NO QUESTIONS LOADED: Show initial file load button
+                // 4. NO QUESTIONS LOADED: Show initial download button
                 <Button
-                  onClick={handleInitialLoadClick}
+                  onClick={handleInitialDownloadClick}
                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700"
                   size="lg"
                 >
-                  Load Questions File
+                  <Download className="h-5 w-5" />
+                  Download Practice Questions
                 </Button>
               )}
 
-              {!state.hasLoadedQuestions && !state.selectedFile && !state.processingResult && (
+              {!state.hasLoadedQuestions && !state.downloadResult && !state.isDownloading && (
                 <p className="text-sm text-red-600">
-                  Please load a questions file to begin.
+                  Please download practice questions to begin.
                 </p>
               )}
             </div>
 
             {/* Stats - Only show when we have loaded questions */}
-            {state.hasLoadedQuestions && !state.isProcessingFile && !state.processingResult && (
+            {state.hasLoadedQuestions && !state.isDownloading && !state.downloadResult && (
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="text-blue-600 font-bold text-lg">
                     {state.categories.length - 1}
                   </div>
-                  <div className="text-xs text-blue-800">Categories</div>
+                  <div className="text-xs text-blue-800">Categories Available</div>
                 </div>
                 <div className="bg-green-50 rounded-lg p-4">
                   <div className="text-green-600 font-bold text-lg">
                     {state.selectedCategory}
                   </div>
-                  <div className="text-xs text-green-800">Selected</div>
+                  <div className="text-xs text-green-800">Selected Category</div>
                 </div>
               </div>
             )}
+
+            {/* Information Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+              <h4 className="font-semibold text-blue-800 mb-2">Practice Information</h4>
+              <ul className="text-sm text-blue-700 space-y-1 text-left">
+                <li>• Questions are loaded automatically from our question bank</li>
+                <li>• Each category contains hands-on practice questions</li>
+                <li>• You can practice at your own pace</li>
+                <li>• Reload questions to get the latest updates</li>
+                {state.hasLoadedQuestions && (
+                  <li className="text-green-700 font-medium">
+                    • {state.categories.length - 1} categories loaded and ready for practice!
+                  </li>
+                )}
+              </ul>
+            </div>
           </div>
         </Card>
-
-        {/* File Load Dialog */}
-        <FileLoadDialog
-          isOpen={state.showFileLoadDialog}
-          onClose={handleFileLoadCancelled}
-          onConfirm={handleFileLoadConfirmed} 
-          title="Load Questions File"
-          message="Select a .txt or .csv file containing your data science challenges. The questions will be loaded into your browser for practice."
-        />
-        
-        {/* Progress Dialog */}
-        <ProgressDialog
-          isOpen={state.isProcessingFile}
-          title="Processing Questions"
-          message={`Processing file: ${state.selectedFile?.name || 'Loading'}. Please wait...`}
-        />
       </main>
     </div>
   );

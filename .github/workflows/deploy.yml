@@ -24,6 +24,7 @@ jobs:
       - name: Install dependencies and build Next.js app 🚀
         env:
           NEXT_PUBLIC_GRADED_QUIZ_ENABLED: ${{ secrets.GRADED_QUIZ_ENABLED }}
+          NEXT_PUBLIC_NEW_PRACTICE_QUESTIONS_AVAILABLE: ${{ secrets.NEW_PRACTICE_QUESTIONS_AVAILABLE }}
           NEXT_PUBLIC_QUIZ_NUMBER: ${{ secrets.QUIZ_NUMBER }}
           NEXT_PUBLIC_QUIZ_TIME_LIMIT: ${{ secrets.QUIZ_TIME_LIMIT }}
           NEXT_PUBLIC_WHATSAPP_SERVICE_URL: ${{ secrets.WHATSAPP_SERVICE_URL }}
@@ -37,6 +38,7 @@ jobs:
           NEXT_PUBLIC_GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
           NEXT_PUBLIC_GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           NEXT_PUBLIC_NOTEBOOK_FOLDER_ID: ${{ secrets.NOTEBOOK_FOLDER_ID }}
+          NEXT_PUBLIC_DEAMV_FOLDER_ID: ${{ secrets.DEAMV_FOLDER_ID }}
         run: |
           # The secrets are available in the shell environment when npm run build runs
           npm install --force
