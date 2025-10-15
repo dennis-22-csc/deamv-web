@@ -137,7 +137,7 @@ function PracticePageContent() {
 	const loadChallenges = useCallback(async () => {
 		try {
 			// This depends on the category which is dynamic
-			const challenges = await practiceDatabase.getDataScienceChallengesByCategory(category);
+			const challenges = await practiceDatabase.getDataScienceChallengesByCategory(category, 10);
 
 			if (challenges.length === 0) {
 				setState(prev => ({

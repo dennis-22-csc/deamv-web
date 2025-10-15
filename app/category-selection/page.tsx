@@ -416,7 +416,7 @@ export default function CategorySelectionPage() {
                     <Progress value={state.downloadProgress} className="h-2" />
                     <p className="text-xs text-gray-500">
                       {state.downloadProgress < 20 ? 'Clearing existing questions...' :
-                       state.downloadProgress < 60 ? 'Fetching from Google Drive...' : 
+                       state.downloadProgress < 60 ? 'Fetching from Server...' : 
                        state.downloadProgress < 80 ? 'Processing questions...' : 
                        'Saving to local storage...'}
                     </p>
