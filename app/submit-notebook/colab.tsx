@@ -28,7 +28,8 @@ const StatusDialog: React.FC<{ isOpen: boolean, title: string, message: string, 
 
 const CLASS_OPTIONS = [
     'Class 1: Introduction to Data and Data Science', 
-    'Class 2: Pandas Introduction'
+    'Class 2: Pandas Introduction',
+    'Class 3: Data Cleaning',
 ];
 
 export default function NotebookUploadPage() {
