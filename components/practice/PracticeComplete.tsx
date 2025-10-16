@@ -76,6 +76,7 @@ const uploadPracticeData = async (payload: PracticeDataPayload, useSheet: boolea
 
 interface PracticeCompleteProps {
     sessionData: PracticeDataPayload;
+    category?: string;
 }
 
 // Simple reusable component for stats display
@@ -87,7 +88,7 @@ const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, 
 );
 
 // 2. UPDATED PracticeComplete component
-export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData }) => {
+export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData, category }) => {
     const router = useRouter();
     const [registrationCode, setRegistrationCode] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,6 +135,22 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
         };
     }, [sessionData]);
 
+    // NEW: Clean up active practice session when component mounts
+    const cleanupActiveSession = useCallback(async () => {
+        try {
+            const sessionCategory = category || sessionData.category;
+            console.log(`🗑️ [PracticeComplete] Cleaning up active practice session for category: ${sessionCategory}`);
+            
+            const removed = await practiceDatabase.removeActivePracticeSession(sessionCategory);
+            if (removed) {
+                console.log(`✅ [PracticeComplete] Successfully removed active practice session for ${sessionCategory}`);
+            } else {
+                console.log(`ℹ️ [PracticeComplete] No active session found to remove for ${sessionCategory}`);
+            }
+        } catch (error) {
+            console.error('❌ [PracticeComplete] Error cleaning up active session:', error);
+        }
+    }, [category, sessionData.category]);
 
     // --- Data Submission and Retry Logic ---
 
@@ -274,8 +291,15 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
         }
     };
 
+    // Handle navigation back to categories
+    const handleBackToCategories = () => {
+        router.push('/category-selection');
+    };
 
     useEffect(() => {
+        // Clean up active session when component mounts (session is complete)
+        cleanupActiveSession();
+
         if (sessionData.registrationCode && submissionStatus === 'initial') {
             setRegistrationCode(sessionData.registrationCode);
         }
@@ -287,7 +311,7 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
         }, 5 * 60 * 1000); // 5 minutes
 
         return () => clearInterval(retryInterval);
-    }, [sessionData, checkPendingUploads, processPendingUploads, submissionStatus]);
+    }, [sessionData, checkPendingUploads, processPendingUploads, submissionStatus, cleanupActiveSession]);
 
     // 3. UPDATED renderSubmissionContent function
     // This is defined before it's used in renderCompletionMessage
@@ -469,7 +493,7 @@ export const PracticeComplete: React.FC<PracticeCompleteProps> = ({ sessionData 
                     <div className="pt-4 flex justify-center">
                         <Button
                             variant="outline"
-                            onClick={() => router.push('/category-selection')}
+                            onClick={handleBackToCategories}
                             className="flex items-center gap-2 text-lg px-6 py-3 border-2 border-indigo-300 hover:bg-indigo-50 transition duration-150"
                         >
                             <CornerDownLeft className="h-5 w-5" />

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { Play, ArrowLeft, Download, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Select';
@@ -26,6 +26,7 @@ interface CategorySelectionState {
     totalFailed: number;
     categoriesFound: string[];
   } | null;
+  activeSessions: { [category: string]: boolean }; // NEW: Track active sessions by category
 }
 
 export default function CategorySelectionPage() {
@@ -37,18 +38,45 @@ export default function CategorySelectionPage() {
     isDownloading: false,
     downloadProgress: 0,
     downloadResult: null,
+    activeSessions: {}, // NEW: Initialize empty active sessions
   });
 
   const router = useRouter();
+
+  // NEW: Check for active practice sessions
+  const checkActiveSessions = useCallback(async () => {
+    try {
+      console.log('🔍 [CategorySelection] Checking for active practice sessions...');
+      const activeSessions = await practiceDatabase.getAllActivePracticeSessions();
+      
+      const sessionStatus: { [category: string]: boolean } = {};
+      Object.keys(activeSessions).forEach(category => {
+        sessionStatus[category] = true;
+      });
+
+      console.log(`✅ [CategorySelection] Found active sessions for categories:`, Object.keys(activeSessions));
+      
+      setState(prev => ({
+        ...prev,
+        activeSessions: sessionStatus,
+      }));
+
+      return activeSessions;
+    } catch (error) {
+      console.error('❌ [CategorySelection] Error checking active sessions:', error);
+      return {};
+    }
+  }, []);
 
   // Load initial data
   const loadInitialData = useCallback(async () => {
     try {
       console.log('🔍 [CategorySelection] Loading initial data...');
       
-      const [hasQuestions, categories] = await Promise.all([
+      const [hasQuestions, categories, activeSessions] = await Promise.all([
         practiceDatabase.hasDataScienceChallenges(),
         practiceDatabase.getAllCategories(),
+        checkActiveSessions(), // NEW: Check for active sessions in parallel
       ]);
 
       const allCategories = ['General', ...categories.filter(cat => cat !== 'General')];
@@ -69,7 +97,7 @@ export default function CategorySelectionPage() {
       setState(prev => ({ ...prev, isLoading: false }));
       return false; // Indicate failure
     }
-  }, []);
+  }, [checkActiveSessions]);
 
   /**
    * Clear existing questions before saving new ones
@@ -242,6 +270,45 @@ export default function CategorySelectionPage() {
     }
   }, [loadInitialData, saveQuestionsToStorage, clearExistingQuestions]);
 
+  // NEW: Check if selected category has active session
+  const hasActiveSessionForSelectedCategory = state.activeSessions[state.selectedCategory] === true;
+
+  // NEW: Handle resume practice session
+  const handleResumePractice = async () => {
+    if (!state.hasLoadedQuestions) {
+      console.error('❌ [CategorySelection] Cannot resume practice - no questions loaded');
+      return;
+    }
+    
+    try {
+      console.log(`🔄 [CategorySelection] Resuming practice session for category: ${state.selectedCategory}`);
+      router.push(`/practice?category=${encodeURIComponent(state.selectedCategory)}&resume=true`);
+    } catch (error) {
+      console.error('❌ [CategorySelection] Error resuming practice:', error);
+    }
+  };
+
+  // NEW: Clear active session for a category
+  const handleClearActiveSession = async () => {
+    try {
+      console.log(`🗑️ [CategorySelection] Clearing active session for category: ${state.selectedCategory}`);
+      await practiceDatabase.removeActivePracticeSession(state.selectedCategory);
+      
+      // Update local state
+      setState(prev => ({
+        ...prev,
+        activeSessions: {
+          ...prev.activeSessions,
+          [state.selectedCategory]: false,
+        },
+      }));
+      
+      console.log(`✅ [CategorySelection] Active session cleared for ${state.selectedCategory}`);
+    } catch (error) {
+      console.error('❌ [CategorySelection] Error clearing active session:', error);
+    }
+  };
+
   // FIX: Modify useEffect to respect the environment variable
   useEffect(() => {
     const initializePage = async () => {
@@ -324,8 +391,9 @@ export default function CategorySelectionPage() {
    */
   const handleClearAllQuestions = async () => {
     try {
-      console.log('🗑️ [CategorySelection] Clearing all questions...');
+      console.log('🗑️ [CategorySelection] Clearing all questions and active sessions...');
       await practiceDatabase.clearDataScienceChallenges();
+      await practiceDatabase.clearAllActivePracticeSessions();
       
       // Reset state
       setState(prev => ({
@@ -334,9 +402,10 @@ export default function CategorySelectionPage() {
         categories: ['General'],
         selectedCategory: 'General',
         downloadResult: null,
+        activeSessions: {},
       }));
       
-      console.log('✅ [CategorySelection] All questions cleared');
+      console.log('✅ [CategorySelection] All questions and sessions cleared');
     } catch (error) {
       console.error('❌ [CategorySelection] Error clearing questions:', error);
     }
@@ -403,6 +472,21 @@ export default function CategorySelectionPage() {
                 placeholder="Select a category"
               />
               
+              {/* Active Session Banner */}
+              {hasActiveSessionForSelectedCategory && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <RotateCcw className="h-5 w-5 text-green-600" />
+                    <div className="text-left">
+                      <h4 className="font-medium text-green-800">Session in Progress</h4>
+                      <p className="text-sm text-green-700">
+                        You have an active practice session. You can resume where you left off.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Conditional Button based on state */}
               {state.isDownloading ? (
                 // 1. DOWNLOADING: Show download progress
@@ -442,13 +526,13 @@ export default function CategorySelectionPage() {
                     // Success or partial success: Show practice button
                     <div className="space-y-2">
                       <Button
-                        onClick={handleStartPractice}
+                        onClick={hasActiveSessionForSelectedCategory ? handleResumePractice : handleStartPractice}
                         className="w-full flex items-center justify-center gap-2"
                         size="lg"
                         disabled={!state.hasLoadedQuestions}
                       >
                         <Play className="h-5 w-5" />
-                        Start Practice
+                        {hasActiveSessionForSelectedCategory ? 'Resume Practice' : 'Start Practice'}
                       </Button>
                       <div className="flex gap-2">
                         <Button
@@ -460,6 +544,17 @@ export default function CategorySelectionPage() {
                           <Download className="h-4 w-4" />
                           Refetch Questions
                         </Button>
+                        {hasActiveSessionForSelectedCategory && (
+                          <Button
+                            variant="outline"
+                            onClick={handleClearActiveSession}
+                            className="flex-1 text-red-600 hover:text-red-700"
+                            size="sm"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Reset Session
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -485,15 +580,15 @@ export default function CategorySelectionPage() {
                   )}
                 </div>
               ) : state.hasLoadedQuestions ? (
-                // 3. QUESTIONS ALREADY LOADED: Show normal Start button
+                // 3. QUESTIONS ALREADY LOADED: Show practice button with resume option
                 <div className="space-y-3">
                   <Button
-                    onClick={handleStartPractice}
+                    onClick={hasActiveSessionForSelectedCategory ? handleResumePractice : handleStartPractice}
                     className="w-full flex items-center justify-center gap-2"
                     size="lg"
                   >
                     <Play className="h-5 w-5" />
-                    Start Practice
+                    {hasActiveSessionForSelectedCategory ? 'Resume Practice' : 'Start Practice'}
                   </Button>
                   <div className="flex gap-2">
                     <Button
@@ -505,6 +600,17 @@ export default function CategorySelectionPage() {
                       <Download className="h-4 w-4" />
                       Reload Questions
                     </Button>
+                    {hasActiveSessionForSelectedCategory && (
+                      <Button
+                        variant="outline"
+                        onClick={handleClearActiveSession}
+                        className="flex-1 text-red-600 hover:text-red-700"
+                        size="sm"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset Session
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       onClick={handleClearAllQuestions}
@@ -547,7 +653,9 @@ export default function CategorySelectionPage() {
                   <div className="text-green-600 font-bold text-lg">
                     {state.selectedCategory}
                   </div>
-                  <div className="text-xs text-green-800">Selected Category</div>
+                  <div className="text-xs text-green-800">
+                    {hasActiveSessionForSelectedCategory ? 'Session in Progress' : 'Selected Category'}
+                  </div>
                 </div>
               </div>
             )}
@@ -560,7 +668,12 @@ export default function CategorySelectionPage() {
                 <li>• Each category contains hands-on practice questions</li>
                 <li>• You can practice at your own pace</li>
                 <li>• Reload questions to get the latest updates</li>
-                {state.hasLoadedQuestions && (
+                {hasActiveSessionForSelectedCategory && (
+                  <li className="text-green-700 font-medium">
+                    • You have an active session - resume where you left off!
+                  </li>
+                )}
+                {state.hasLoadedQuestions && !hasActiveSessionForSelectedCategory && (
                   <li className="text-green-700 font-medium">
                     • {state.categories.length - 1} categories loaded and ready for practice!
                   </li>

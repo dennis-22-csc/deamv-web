@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Volume2, VolumeX, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Volume2, VolumeX, CheckCircle, XCircle, Play } from 'lucide-react';
 import { Suspense } from 'react'; 
 
 // UI Components
@@ -19,7 +19,7 @@ import { PracticeComplete } from '@/components/practice/PracticeComplete';
 // Libs/Database
 import { getApiKey } from '@/lib/storage';
 import { practiceDatabase } from '@/lib/database';
-import { DataScienceChallenge, ChallengeAttempt, PracticeDataPayload } from '@/lib/database';
+import { DataScienceChallenge, ChallengeAttempt, PracticeDataPayload, PracticeSession } from '@/lib/database';
 
 // Define the API endpoint for evaluation
 const EVALUATION_API_ENDPOINT = '/api/evaluate-answer';
@@ -73,6 +73,7 @@ interface PracticeState {
 	sessionStartTime: number; // For tracking total time
 	sessionEndTime: number | null; // Null means session is ongoing
 	allChallengeAttempts: ChallengeAttempt[]; // Completed attempts log
+	sessionId?: string; // Store session ID for resuming
 }
 
 // ----------------------------------------------------------------------
@@ -82,6 +83,7 @@ function PracticePageContent() {
 	// The useSearchParams hook is now correctly inside a component that will be wrapped
 	const searchParams = useSearchParams();
 	const category = searchParams.get('category') || 'General';
+	const resumeSession = searchParams.get('resume') === 'true';
 	const router = useRouter();
 
 	const [state, setState] = useState<PracticeState>({
@@ -111,6 +113,142 @@ function PracticePageContent() {
 
 	const [tts, setTts] = useState<SpeechSynthesisUtterance | null>(null);
 	const [isTtsReady, setIsTtsReady] = useState(false);
+
+	// NEW: Check for existing session on component mount
+	const checkExistingSession = useCallback(async () => {
+		try {
+			if (resumeSession) {
+				console.log(`🔄 [PracticePage] Checking for existing session in category: ${category}`);
+				const existingSession = await practiceDatabase.getActivePracticeSession(category);
+				
+				if (existingSession) {
+					console.log(`✅ [PracticePage] Found existing session:`, {
+						id: existingSession.id,
+						currentIndex: existingSession.currentIndex,
+						completed: existingSession.completed.length,
+						totalChallenges: existingSession.challenges.length
+					});
+					
+					// Load the session data
+					await loadSessionData(existingSession);
+					return true;
+				} else {
+					console.log(`ℹ️ [PracticePage] No existing session found for category: ${category}`);
+				}
+			}
+			return false;
+		} catch (error) {
+			console.error('❌ [PracticePage] Error checking for existing session:', error);
+			return false;
+		}
+	}, [category, resumeSession]);
+
+	// NEW: Load session data from existing session
+	const loadSessionData = useCallback(async (session: PracticeSession) => {
+		try {
+			console.log(`📥 [PracticePage] Loading session data for session: ${session.id}`);
+			
+			// Get the challenge details for the session
+			const sessionChallenges: DataScienceChallenge[] = [];
+			for (const challengeId of session.challenges) {
+				const challenge = await practiceDatabase.getChallengeById(challengeId);
+				if (challenge) {
+					sessionChallenges.push(challenge);
+				}
+			}
+
+			if (sessionChallenges.length === 0) {
+				console.warn(`⚠️ [PracticePage] No challenges found for session ${session.id}`);
+				return false;
+			}
+
+			// Reconstruct attempts from completed challenges
+			const reconstructedAttempts: ChallengeAttempt[] = [];
+			
+			// For each completed challenge, create a basic attempt record
+			for (const completedId of session.completed) {
+				const challenge = sessionChallenges.find(c => c.id === completedId);
+				if (challenge) {
+					reconstructedAttempts.push({
+						challengeId: completedId,
+						isCorrect: true, // Assume completed challenges were correct
+						trials: 1, // Default value
+						gotOnFirstTrial: true, // Default value
+						showAnswerClicked: false, // Default value
+						timeSpentSeconds: 60, // Default value
+						timestamp: new Date(session.startTime), // Use session start time
+						incorrectAttempts: [],
+					});
+				}
+			}
+
+			// Update state with session data
+			setState(prev => ({
+				...prev,
+				challenges: sessionChallenges,
+				currentChallengeIndex: session.currentIndex,
+				sessionStartTime: session.startTime.getTime(),
+				sessionId: session.id,
+				allChallengeAttempts: reconstructedAttempts,
+				isLoading: false,
+			}));
+
+			// Set up current attempt for the current challenge
+			const currentChallenge = sessionChallenges[session.currentIndex];
+			if (currentChallenge) {
+				setCurrentAttempt({
+					challengeId: currentChallenge.id,
+					startTime: Date.now(), // Reset start time for current challenge
+					trials: 0,
+					showAnswerClicked: false,
+					incorrectAttempts: [],
+				});
+
+				if (isTtsReady) {
+					speakChallengeInstruction(currentChallenge, session.currentIndex, sessionChallenges.length);
+				}
+			}
+
+			console.log(`✅ [PracticePage] Session loaded successfully. Current challenge: ${session.currentIndex + 1}/${sessionChallenges.length}`);
+			return true;
+		} catch (error) {
+			console.error('❌ [PracticePage] Error loading session data:', error);
+			return false;
+		}
+	}, [isTtsReady]);
+
+	// NEW: Save session progress
+	const saveSessionProgress = useCallback(async () => {
+		try {
+			if (!state.sessionId && state.challenges.length > 0) {
+				// Create new session
+				const challengeIds = state.challenges.map(c => c.id);
+				const sessionId = await practiceDatabase.createPracticeSession(category, challengeIds);
+				setState(prev => ({ ...prev, sessionId }));
+				console.log(`💾 [PracticePage] Created new session: ${sessionId}`);
+			}
+
+			if (state.sessionId) {
+				// Update existing session
+				const completedIds = state.allChallengeAttempts.map(attempt => attempt.challengeId);
+				const sessionData: PracticeSession = {
+					id: state.sessionId,
+					category,
+					challenges: state.challenges.map(c => c.id),
+					completed: completedIds,
+					currentIndex: state.currentChallengeIndex,
+					score: state.allChallengeAttempts.filter(a => a.isCorrect).length,
+					startTime: new Date(state.sessionStartTime),
+					isCompleted: false,
+				};
+
+				await practiceDatabase.saveActivePracticeSession(category, sessionData);
+				console.log(`💾 [PracticePage] Session progress saved: ${state.currentChallengeIndex + 1}/${state.challenges.length}`);
+			}
+		} catch (error) {
+			console.error('❌ [PracticePage] Error saving session progress:', error);
+		}
+	}, [state.sessionId, state.challenges, state.allChallengeAttempts, state.currentChallengeIndex, state.sessionStartTime, category]);
 
 	// Initialize TTS
 	useEffect(() => {
@@ -185,13 +323,27 @@ function PracticePageContent() {
 		}
 	}, [category, isTtsReady]);
 
-	// Load challenges on mount
+	// Load challenges on mount - UPDATED to check for existing sessions first
 	useEffect(() => {
-		// Only load if challenges array is empty and not already loading
-		if (state.challenges.length === 0 && state.isLoading) {
-			loadChallenges();
+		const initializePractice = async () => {
+			// First, check for existing session
+			const hasExistingSession = await checkExistingSession();
+			
+			// If no existing session found, load new challenges
+			if (!hasExistingSession && state.challenges.length === 0 && state.isLoading) {
+				await loadChallenges();
+			}
+		};
+
+		initializePractice();
+	}, [checkExistingSession, loadChallenges, state.challenges.length, state.isLoading]);
+
+	// Save session progress when state changes
+	useEffect(() => {
+		if (state.challenges.length > 0 && !state.isLoading) {
+			saveSessionProgress();
 		}
-	}, [loadChallenges, state.challenges.length, state.isLoading]);
+	}, [state.currentChallengeIndex, state.allChallengeAttempts, saveSessionProgress, state.challenges.length, state.isLoading]);
 
 	// Safe access to current challenge
 	const currentChallenge = state.challenges[state.currentChallengeIndex];
@@ -290,12 +442,12 @@ function PracticePageContent() {
 				throw new Error('API key not found. Please configure your Gemini API key in settings.');
 			}
 
-			// Prepare the payload 
+			// Prepare the payload 
 			const payload: EvaluationRequest = {
 				instruction: currentChallenge.instruction,
 				userCode: state.userCode,
 				expectedSolution: currentChallenge.solution,
-				apiKey: apiKey, 
+				apiKey: apiKey, 
 			};
 
 			// Use fetch to call the Route Handler
@@ -493,12 +645,16 @@ function PracticePageContent() {
 		setState(prev => ({ ...prev, showLeaveConfirmation: false }));
 	};
 
+	// NEW: Show session resume banner
+	// FIX: Explicitly cast to boolean using !! to avoid the expression returning a string ('') or a string ('session-id')
+	const showResumeBanner = !!(resumeSession && state.sessionId && state.currentChallengeIndex > 0);
+
 	if (state.sessionEndTime !== null) {
 		// 1. Create the final PracticeDataPayload
 		const totalTimeSeconds = Math.round((state.sessionEndTime - state.sessionStartTime) / 1000);
 
 		const finalSessionData: PracticeDataPayload = {
-			sessionId: state.sessionStartTime.toString(),
+			sessionId: state.sessionId || state.sessionStartTime.toString(),
 			registrationCode: null, // To be filled in PracticeComplete
 			category: category,
 			startTime: new Date(state.sessionStartTime),
@@ -513,14 +669,16 @@ function PracticePageContent() {
 			attempts: state.allChallengeAttempts,
 		};
 
-		return <PracticeComplete sessionData={finalSessionData} />;
+		return <PracticeComplete sessionData={finalSessionData} category={category} />;
 	}
 
 	if (state.isLoading) {
 		return (
 			<div className="min-h-screen bg-gray-50">
 				<div className="max-w-6xl mx-auto px-4 py-6">
-					<Card className="p-8 text-center">Loading Challenges for <b>{category}</b>...</Card>
+					<Card className="p-8 text-center">
+						{resumeSession ? 'Checking for existing session...' : `Loading Challenges for <b>${category}</b>...`}
+					</Card>
 				</div>
 			</div>
 		);
@@ -572,9 +730,17 @@ function PracticePageContent() {
 								<ArrowLeft className="h-4 w-4" />
 								Leave Practice
 							</Button>
-							<h1 className="text-xl font-semibold text-gray-900">
-								Practice - {category}
-							</h1>
+							<div>
+								<h1 className="text-xl font-semibold text-gray-900">
+									Practice - {category}
+								</h1>
+								{showResumeBanner && (
+									<p className="text-sm text-green-600 flex items-center gap-1">
+										<Play className="h-3 w-3" />
+										Resuming your session ({state.currentChallengeIndex + 1}/{totalChallenges})
+									</p>
+								)}
+							</div>
 						</div>
 
 						<Button
@@ -594,6 +760,21 @@ function PracticePageContent() {
 			</header>
 
 			<main className="max-w-6xl mx-auto px-4 py-6">
+				{/* Session Resume Banner */}
+				{showResumeBanner && (
+					<div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+						<div className="flex items-center gap-3">
+							<Play className="h-5 w-5 text-green-600" />
+							<div>
+								<h3 className="font-medium text-green-800">Session Resumed</h3>
+								<p className="text-sm text-green-700">
+									Continuing from where you left off. You've completed {state.currentChallengeIndex} of {totalChallenges} challenges.
+								</p>
+							</div>
+						</div>
+					</div>
+				)}
+
 				<div className="space-y-6">
 					{/* Progress Indicator */}
 					<ProgressIndicator
@@ -607,6 +788,7 @@ function PracticePageContent() {
 						currentCategory={category}
 						challengeNumber={state.currentChallengeIndex + 1}
 						totalChallenges={totalChallenges}
+						hasExistingSession={showResumeBanner}
 					/>
 
 					{/* Code Input */}
@@ -661,7 +843,7 @@ function PracticePageContent() {
 				onClose={handleCancelLeave}
 				onConfirm={handleConfirmLeave}
 				title="Leave Practice?"
-				message="Your current session progress will be finalized and logged. Are you sure you want to leave?"
+				message="Your current session progress will be saved and you can resume later. Are you sure you want to leave?"
 				confirmText="Leave"
 				cancelText="Stay"
 			/>

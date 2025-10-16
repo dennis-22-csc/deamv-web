@@ -1,8 +1,10 @@
 import React from 'react';
-import { Code, Lightbulb, Clock, BarChart3, Tag } from 'lucide-react';
+import { Code, Lightbulb, Clock, BarChart3, Tag, Play } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 
 interface Challenge {
+  id?: string;
   instruction: string;
   solution: string;
   category: string;
@@ -17,6 +19,8 @@ interface ChallengeViewProps {
   totalChallenges?: number;
   showCategoryInfo?: boolean;
   className?: string;
+  onResumeSession?: () => void;
+  hasExistingSession?: boolean;
 }
 
 const ChallengeView: React.FC<ChallengeViewProps> = ({
@@ -26,6 +30,8 @@ const ChallengeView: React.FC<ChallengeViewProps> = ({
   totalChallenges,
   showCategoryInfo = true,
   className = '',
+  onResumeSession,
+  hasExistingSession = false,
 }) => {
   // Safe check for challenge object
   if (!challenge) {
@@ -98,6 +104,31 @@ const ChallengeView: React.FC<ChallengeViewProps> = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
+      {/* Session Resume Banner */}
+      {hasExistingSession && onResumeSession && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Play className="h-5 w-5 text-blue-600" />
+              <div>
+                <h4 className="font-medium text-blue-800">Continue Your Session</h4>
+                <p className="text-sm text-blue-700">
+                  You have an existing practice session in progress for this category.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={onResumeSession}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Play className="h-4 w-4 mr-1" />
+              Resume Session
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Challenge Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -211,11 +242,13 @@ const ChallengeView: React.FC<ChallengeViewProps> = ({
 interface CompactChallengeViewProps {
   challenge?: Challenge | null;
   className?: string;
+  hasExistingSession?: boolean;
 }
 
 const CompactChallengeView: React.FC<CompactChallengeViewProps> = ({
   challenge,
   className = '',
+  hasExistingSession = false,
 }) => {
   if (!challenge) {
     return (
@@ -230,6 +263,12 @@ const CompactChallengeView: React.FC<CompactChallengeViewProps> = ({
   return (
     <Card className={`p-4 ${className}`}>
       <div className="space-y-3">
+        {hasExistingSession && (
+          <div className="bg-blue-50 border border-blue-200 rounded px-2 py-1 text-xs text-blue-700 font-medium">
+            Session in Progress
+          </div>
+        )}
+        
         <div className="flex items-center gap-2">
           <Code className="h-4 w-4 text-blue-600" />
           <h3 className="font-semibold text-gray-900 text-sm">Challenge</h3>
@@ -257,11 +296,15 @@ const CompactChallengeView: React.FC<CompactChallengeViewProps> = ({
 interface ChallengeInstructionProps {
   instruction?: string;
   className?: string;
+  showResumeBanner?: boolean;
+  onResumeSession?: () => void;
 }
 
 const ChallengeInstruction: React.FC<ChallengeInstructionProps> = ({
   instruction,
   className = '',
+  showResumeBanner = false,
+  onResumeSession,
 }) => {
   if (!instruction) {
     return (
@@ -272,18 +315,43 @@ const ChallengeInstruction: React.FC<ChallengeInstructionProps> = ({
   }
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 p-4 ${className}`}>
-      <h4 className="font-medium text-gray-900 mb-2">Instruction:</h4>
-      <div 
-        className="text-gray-700 text-sm leading-relaxed prose prose-sm max-w-none"
-        dangerouslySetInnerHTML={{ 
-          __html: instruction
-            .replace(/```python\n?([\s\S]*?)```/g, '<pre class="bg-gray-100 p-2 rounded my-1 overflow-x-auto text-xs"><code>$1</code></pre>')
-            .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs font-mono">$1</code>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\n/g, '<br />')
-        }}
-      />
+    <div className={`space-y-3 ${className}`}>
+      {/* Resume Session Banner */}
+      {showResumeBanner && onResumeSession && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Play className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">
+                Session in progress - click to resume
+              </span>
+            </div>
+            <Button
+              onClick={onResumeSession}
+              size="sm"
+              variant="outline"
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              Resume
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Instruction Content */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h4 className="font-medium text-gray-900 mb-2">Instruction:</h4>
+        <div 
+          className="text-gray-700 text-sm leading-relaxed prose prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ 
+            __html: instruction
+              .replace(/```python\n?([\s\S]*?)```/g, '<pre class="bg-gray-100 p-2 rounded my-1 overflow-x-auto text-xs"><code>$1</code></pre>')
+              .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 rounded text-xs font-mono">$1</code>')
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\n/g, '<br />')
+          }}
+        />
+      </div>
     </div>
   );
 };
