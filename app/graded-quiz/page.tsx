@@ -55,7 +55,7 @@ export default function GradedQuizPage() {
       setProgress(100);
       
     } catch (err) {
-      console.error('Error loading quiz questions:', err);
+      //console.error('Error loading quiz questions:', err);
       setError(err instanceof Error ? err.message : 'Failed to load quiz questions');
       setLoadingState('error');
     }

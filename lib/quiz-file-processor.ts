@@ -2,390 +2,401 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import Papa from 'papaparse';
-import { GoogleSpreadsheet } from 'google-spreadsheet'; 
+import { GoogleSpreadsheet } from 'google-spreadsheet';
 
+// --- INTERFACES ---
 export interface QuizQuestion {
-  Question: string;
-  Answer: string;
-  Category: string;
-  Type: 'Practical' | 'Theoretical';
+	Question: string;
+	Answer: string;
+	Category: string;
+	Type: 'Practical' | 'Theoretical';
 }
 
 export interface QuizSubmission {
-  registrationCode: string;
-  sessionId: string;
-  startTime: string;
-  endTime: string;
-  totalTime: number;
-  totalQuestions: number;
-  answeredCount: number;
-  answers: { [questionIndex: number]: string };
-  questions: QuizQuestion[];
-  quizNumber: 1 | 2 | 3 | 4;
+	registrationCode: string;
+	sessionId: string;
+	startTime: string;
+	endTime: string;
+	totalTime: number;
+	totalQuestions: number;
+	answeredCount: number;
+	answers: { [questionIndex: number]: string };
+	questions: QuizQuestion[];
+	quizNumber: 1 | 2 | 3 | 4;
 }
 
 export interface FileProcessingResult {
-  success: boolean;
-  message: string;
-  questions: QuizQuestion[];
-  totalProcessed: number;
-  errors: string[];
-  processingTime: number;
+	success: boolean;
+	message: string;
+	questions: QuizQuestion[];
+	totalProcessed: number;
+	errors: string[];
+	processingTime: number;
 }
 
 export interface GoogleDriveConfig {
-  serviceAccountEmail: string;
-  privateKey: string;
+	serviceAccountEmail: string;
+	privateKey: string;
 }
 
 export interface QuizConfig {
-  quizNumber: 1 | 2 | 3 | 4;
-  csvFileName: string;
-  sheetTabName: string;
+	quizNumber: 1 | 2 | 3 | 4;
+	csvFileName: string;
+	sheetTabName: string;
 }
 
+// FIX 2: Update the return type interface to include the 'code' property for specific errors
+export interface SubmissionResult {
+    success: boolean;
+    message: string;
+    error?: string;
+    code?: 'DUPLICATE_ENTRY' | 'SHEET_NOT_FOUND' | 'UNKNOWN_ERROR';
+}
+
+// --- QUIZ FILE PROCESSOR CLASS ---
 class QuizFileProcessor {
-  private config: GoogleDriveConfig;
-  private drive: any;
-  private currentQuizNumber: 1 | 2 | 3 | 4;
+	private config: GoogleDriveConfig;
+	private drive: any;
+	
+    // FIX 1: Add a definite assignment assertion (!) or initialize it in the constructor
+    // Since initializeAuth() is called in the constructor, the assertion is appropriate here.
+	private auth!: JWT; // Store the JWT instance for reuse
+	private currentQuizNumber: 1 | 2 | 3 | 4;
 
-  constructor(config: GoogleDriveConfig) {
-    this.config = config;
-    this.currentQuizNumber = this.getCurrentQuizNumberFromEnv();
-    this.initializeDrive();
-  }
+	constructor(config: GoogleDriveConfig) {
+		this.config = config;
+		this.currentQuizNumber = this.getCurrentQuizNumberFromEnv();
+		this.initializeAuth(); // Initialize Auth first
+		this.initializeDrive();
+	}
 
-  
-  private getCurrentQuizNumberFromEnv(): 1 | 2 | 3 | 4 {
-   const envQuizNumber = process.env.NEXT_PUBLIC_QUIZ_NUMBER;
+	private initializeAuth() {
+		this.auth = new JWT({
+			email: this.config.serviceAccountEmail,
+			key: this.config.privateKey.replace(/\\n/g, '\n'),
+			// Use the broadest scope needed for all operations (Drive & Sheets)
+			scopes: [
+				'https://www.googleapis.com/auth/drive.readonly',
+				'https://www.googleapis.com/auth/drive.file',
+				'https://www.googleapis.com/auth/spreadsheets'
+			],
+		});
+	}
 
-    if (!envQuizNumber) {
-        throw new Error('❌ [QuizFileProcessor] Required environment variable NEXT_PUBLIC_QUIZ_NUMBER is not set. Cannot determine quiz to load.');
-    }
-    
-    const quizNumber = parseInt(envQuizNumber);
+	private getCurrentQuizNumberFromEnv(): 1 | 2 | 3 | 4 {
+		const envQuizNumber = process.env.NEXT_PUBLIC_QUIZ_NUMBER;
 
-    if (![1, 2, 3, 4].includes(quizNumber)) {
-        throw new Error(`❌ [QuizFileProcessor] Invalid QUIZ_NUMBER '${envQuizNumber}'. Must be 1, 2, 3, or 4.`);
-    }
+		if (!envQuizNumber) {
+			throw new Error('❌ [QuizFileProcessor] Required environment variable NEXT_PUBLIC_QUIZ_NUMBER is not set. Cannot determine quiz to load.');
+		}
 
-   console.log(`🔍 [QuizFileProcessor] Using Quiz ${quizNumber} configuration`);
-   return quizNumber as 1 | 2 | 3 | 4;
- }
+		const quizNumber = parseInt(envQuizNumber);
 
-  
-  private getCurrentQuizConfig(): QuizConfig {
-    const quizNumber = this.currentQuizNumber;
-    return {
-      quizNumber,
-      csvFileName: `quiz_questions_${quizNumber}.csv`,
-      sheetTabName: `Quiz ${quizNumber}`
-    };
-  }
+		if (![1, 2, 3, 4].includes(quizNumber)) {
+			throw new Error(`❌ [QuizFileProcessor] Invalid QUIZ_NUMBER '${envQuizNumber}'. Must be 1, 2, 3, or 4.`);
+		}
 
-  getAvailableQuizzes(): QuizConfig[] {
-    return [
-      { quizNumber: 1, csvFileName: 'quiz_questions_1.csv', sheetTabName: 'Quiz 1' },
-      { quizNumber: 2, csvFileName: 'quiz_questions_2.csv', sheetTabName: 'Quiz 2' },
-      { quizNumber: 3, csvFileName: 'quiz_questions_3.csv', sheetTabName: 'Quiz 3' },
-      { quizNumber: 4, csvFileName: 'quiz_questions_4.csv', sheetTabName: 'Quiz 4' }
-    ];
-  }
+		return quizNumber as 1 | 2 | 3 | 4;
+	}
 
-  private initializeDrive() {
-    const auth = new JWT({
-      email: this.config.serviceAccountEmail,
-      key: this.config.privateKey.replace(/\\n/g, '\n'),
-      scopes: [
-        'https://www.googleapis.com/auth/drive.readonly',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/spreadsheets'
-      ],
-    });
+	private getCurrentQuizConfig(): QuizConfig {
+		const quizNumber = this.currentQuizNumber;
+		return {
+			quizNumber,
+			csvFileName: `quiz_questions_${quizNumber}.csv`,
+			sheetTabName: `Quiz ${quizNumber}`
+		};
+	}
 
-    this.drive = google.drive({ version: 'v3', auth });
-  }
+	getAvailableQuizzes(): QuizConfig[] {
+		return [
+			{ quizNumber: 1, csvFileName: 'quiz_questions_1.csv', sheetTabName: 'Quiz 1' },
+			{ quizNumber: 2, csvFileName: 'quiz_questions_2.csv', sheetTabName: 'Quiz 2' },
+			{ quizNumber: 3, csvFileName: 'quiz_questions_3.csv', sheetTabName: 'Quiz 3' },
+			{ quizNumber: 4, csvFileName: 'quiz_questions_4.csv', sheetTabName: 'Quiz 4' }
+		];
+	}
 
-  
-  async downloadQuizQuestions(): Promise<FileProcessingResult> {
-    const quizConfig = this.getCurrentQuizConfig();
-    const startTime = Date.now();
-    const result: FileProcessingResult = {
-      success: false,
-      message: '',
-      questions: [],
-      totalProcessed: 0,
-      errors: [],
-      processingTime: 0
-    };
+	private initializeDrive() {
+		// Reuse the stored JWT instance
+		this.drive = google.drive({ version: 'v3', auth: this.auth });
+	}
 
-    try {
-      console.log(`🔍 [QuizFileProcessor] Starting Quiz ${quizConfig.quizNumber} questions download from: ${quizConfig.csvFileName}`);
+	async downloadQuizQuestions(): Promise<FileProcessingResult> {
+		const quizConfig = this.getCurrentQuizConfig();
+		const startTime = Date.now();
+		const result: FileProcessingResult = {
+			success: false,
+			message: '',
+			questions: [],
+			totalProcessed: 0,
+			errors: [],
+			processingTime: 0
+		};
 
-      // Validate configuration
-      if (!this.config.serviceAccountEmail || !this.config.privateKey) {
-        throw new Error('Google Drive configuration incomplete');
-      }
+		try {
+			// Validate configuration
+			if (!this.config.serviceAccountEmail || !this.config.privateKey) {
+				throw new Error('Google Drive configuration incomplete');
+			}
 
-      // Search for the CSV file in Google Drive
-      console.log(`🔍 [QuizFileProcessor] Searching for CSV file: ${quizConfig.csvFileName}`);
-      const searchResponse = await this.drive.files.list({
-        q: `name='${quizConfig.csvFileName}' and mimeType='text/csv' and trashed=false`,
-        fields: 'files(id, name)',
-      });
+			// Search for the CSV file in Google Drive
+			const searchResponse = await this.drive.files.list({
+				q: `name='${quizConfig.csvFileName}' and mimeType='text/csv' and trashed=false`,
+				fields: 'files(id, name)',
+			});
 
-      const files = searchResponse.data.files;
-      
-      if (!files || files.length === 0) {
-        throw new Error(`CSV file '${quizConfig.csvFileName}' not found in Google Drive for Quiz ${quizConfig.quizNumber}. Please upload the file.`);
-      }
+			const files = searchResponse.data.files;
 
-      const csvFile = files[0];
-      console.log(`✅ [QuizFileProcessor] Found CSV file for Quiz ${quizConfig.quizNumber}: ${csvFile.name} (ID: ${csvFile.id})`);
+			if (!files || files.length === 0) {
+				throw new Error(`CSV file '${quizConfig.csvFileName}' not found in Google Drive for Quiz ${quizConfig.quizNumber}. Please upload the file.`);
+			}
 
-      // Download the CSV file content
-      console.log('🔍 [QuizFileProcessor] Downloading CSV file content...');
-      const fileResponse = await this.drive.files.get({
-        fileId: csvFile.id,
-        alt: 'media',
-      }, { responseType: 'stream' });
+			const csvFile = files[0];
 
-      // Convert stream to string
-      const csvContent = await this.streamToString(fileResponse.data);
-      
-      if (!csvContent) {
-        throw new Error('Failed to download CSV file content');
-      }
+			// Download the CSV file content
+			const fileResponse = await this.drive.files.get({
+				fileId: csvFile.id,
+				alt: 'media',
+			}, { responseType: 'stream' });
 
-      console.log(`📄 [QuizFileProcessor] Downloaded CSV content (${csvContent.length} characters)`);
+			// Convert stream to string
+			const csvContent = await this.streamToString(fileResponse.data);
 
-      // Parse CSV content
-      const questions = this.parseQuizCsv(csvContent);
-      
-      if (questions.length === 0) {
-        throw new Error(`No valid questions found in ${quizConfig.csvFileName}. Please check the file format.`);
-      }
+			if (!csvContent) {
+				throw new Error('Failed to download CSV file content');
+			}
 
-      result.questions = questions;
-      result.totalProcessed = questions.length;
-      result.success = true;
-      result.message = `Successfully loaded ${questions.length} quiz questions for Quiz ${quizConfig.quizNumber}`;
-      result.processingTime = Date.now() - startTime;
+			// Parse CSV content
+			const questions = this.parseQuizCsv(csvContent);
 
-      console.log(`✅ [QuizFileProcessor] Quiz ${quizConfig.quizNumber} questions download completed:`, result);
+			if (questions.length === 0) {
+				throw new Error(`No valid questions found in ${quizConfig.csvFileName}. Please check the file format.`);
+			}
 
-    } catch (error) {
-      console.error(`❌ [QuizFileProcessor] Error downloading Quiz ${quizConfig.quizNumber} questions:`, error);
-      result.errors.push(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      result.processingTime = Date.now() - startTime;
-    }
+			result.questions = questions;
+			result.totalProcessed = questions.length;
+			result.success = true;
+			result.message = `Successfully loaded ${questions.length} quiz questions for Quiz ${quizConfig.quizNumber}`;
+			result.processingTime = Date.now() - startTime;
 
-    return result;
-  }
+		} catch (error) {
+			result.errors.push(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			result.processingTime = Date.now() - startTime;
+		}
 
-  /**
-   * Convert stream to string
-   */
-  private streamToString(stream: any): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      stream.on('error', reject);
-    });
-  }
+		return result;
+	}
 
-  /**
-   * Parse CSV content into QuizQuestion objects
-   */
-  private parseQuizCsv(csvContent: string): QuizQuestion[] {
-    console.log('🔍 [QuizFileProcessor] Parsing CSV content');
-    
-    const questions: QuizQuestion[] = [];
+	/**
+	 * Convert stream to string
+	 */
+	private streamToString(stream: any): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const chunks: Buffer[] = [];
+			stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+			stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+			stream.on('error', reject);
+		});
+	}
 
-    try {
-      const results = Papa.parse(csvContent, {
-        header: true,
-        skipEmptyLines: true,
-        transformHeader: (header: string) => {
-          // Normalize header names
-          const normalized = header.trim().toLowerCase();
-          if (normalized.includes('question')) return 'Question';
-          if (normalized.includes('answer') || normalized.includes('solution')) return 'Answer';
-          if (normalized.includes('category') || normalized.includes('topic')) return 'Category';
-          if (normalized.includes('type')) return 'Type';
-          return header;
-        }
-      });
+	/**
+	 * Parse CSV content into QuizQuestion objects
+	 */
+	private parseQuizCsv(csvContent: string): QuizQuestion[] {
 
-      console.log('📊 [QuizFileProcessor] PapaParse results:', {
-        dataLength: results.data?.length,
-        errors: results.errors,
-        meta: results.meta
-      });
+		const questions: QuizQuestion[] = [];
 
-      if (results.errors.length > 0) {
-        console.error('❌ [QuizFileProcessor] CSV parsing errors:', results.errors);
-      }
+		try {
+			const results = Papa.parse(csvContent, {
+				header: true,
+				skipEmptyLines: true,
+				transformHeader: (header: string) => {
+					// Normalize header names
+					const normalized = header.trim().toLowerCase();
+					if (normalized.includes('question')) return 'Question';
+					if (normalized.includes('answer') || normalized.includes('solution')) return 'Answer';
+					if (normalized.includes('category') || normalized.includes('topic')) return 'Category';
+					if (normalized.includes('type')) return 'Type';
+					return header;
+				}
+			});
 
-      const data = results.data as any[];
+			const data = results.data as any[];
 
-      if (!data || data.length === 0) {
-        console.error('❌ [QuizFileProcessor] No data found after CSV parsing');
-        return questions;
-      }
+			if (!data || data.length === 0) {
+				return questions;
+			}
 
-      for (const row of data) {
-        try {
-          const question: QuizQuestion = {
-            Question: (row.Question || '').trim(),
-            Answer: (row.Answer || '').trim(),
-            Category: (row.Category || 'General').trim(),
-            Type: this.normalizeQuestionType(row.Type)
-          };
+			for (const row of data) {
+				try {
+					const question: QuizQuestion = {
+						Question: (row.Question || '').trim(),
+						Answer: (row.Answer || '').trim(),
+						Category: (row.Category || 'General').trim(),
+						Type: this.normalizeQuestionType(row.Type)
+					};
 
-          // Validate required fields
-          if (question.Question && question.Answer) {
-            questions.push(question);
-          } else {
-            console.warn('⚠️ [QuizFileProcessor] Skipping invalid row - missing Question or Answer:', {
-              hasQuestion: !!question.Question,
-              hasAnswer: !!question.Answer,
-              row
-            });
-          }
-        } catch (error) {
-          console.error('❌ [QuizFileProcessor] Error parsing row:', error, row);
-        }
-      }
+					// Validate required fields
+					if (question.Question && question.Answer) {
+						questions.push(question);
+					}
+				} catch (error) {
+					// error handling
+				}
+			}
+		} catch (error) {
+			// error handling
+		}
 
-      console.log(`✅ [QuizFileProcessor] Parsed ${questions.length} valid questions`);
-    } catch (error) {
-      console.error('❌ [QuizFileProcessor] CSV parsing failed:', error);
-    }
+		return questions;
+	}
 
-    return questions;
-  }
+	/**
+	 * Normalize question type to Practical/Theoretical
+	 */
+	private normalizeQuestionType(type: string): 'Practical' | 'Theoretical' {
+		if (!type) return 'Theoretical'; // Default to Theoretical
 
-  /**
-   * Normalize question type to Practical/Theoretical
-   */
-  private normalizeQuestionType(type: string): 'Practical' | 'Theoretical' {
-    if (!type) return 'Theoretical'; // Default to Theoretical
-    
-    const normalized = type.trim().toLowerCase();
-    if (normalized.includes('practical') || normalized.includes('coding') || normalized.includes('code')) {
-      return 'Practical';
-    }
-    return 'Theoretical';
-  }
+		const normalized = type.trim().toLowerCase();
+		if (normalized.includes('practical') || normalized.includes('coding') || normalized.includes('code')) {
+			return 'Practical';
+		}
+		return 'Theoretical';
+	}
 
-  /**
-   * Submit quiz results to Google Sheets
-   * Uses environment variable QUIZ_NUMBER to determine which tab to use
-   */
-  async submitQuizResults(submission: QuizSubmission, spreadsheetId: string): Promise<{ success: boolean; message: string; error?: string }> {
-    const quizConfig = this.getCurrentQuizConfig();
-    console.log(`🔍 [QuizFileProcessor] Starting Quiz ${quizConfig.quizNumber} results submission to Google Sheets`);
 
-    try {
-      
-      const auth = new JWT({
-        email: this.config.serviceAccountEmail,
-        key: this.config.privateKey.replace(/\\n/g, '\n'),
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-      });
+	async submitQuizResults(submission: QuizSubmission, spreadsheetId: string): Promise<SubmissionResult> {
+		const quizConfig = this.getCurrentQuizConfig();
+		const resultsSheetName = quizConfig.sheetTabName;
+		const incomingCode = submission.registrationCode.trim().toLowerCase();
 
-      const doc = new GoogleSpreadsheet(spreadsheetId, auth);
-      await doc.loadInfo();
-      
-      console.log(`📊 [QuizFileProcessor] Loaded document for Quiz ${quizConfig.quizNumber}:`, doc.title);
+		try {
+			// --- 1. CLIENT SETUP
+			const sheets = google.sheets({ version: 'v4', auth: this.auth });
 
-      // Look for the specific quiz results sheet
-      const resultsSheetName = quizConfig.sheetTabName;
-      let sheet = doc.sheetsByTitle[resultsSheetName];
-      
-      // Check for sheet existence and FAIL if not found
-      if (!sheet) {
-        const errorMessage = `Sheet '${resultsSheetName}' not found in spreadsheet ID ${spreadsheetId} for Quiz ${quizConfig.quizNumber}. Submission aborted.`;
-        console.error(`❌ [QuizFileProcessor] ${errorMessage}`);
-        return {
-            success: false,
-            message: `Failed to submit quiz results: Sheet for Quiz ${quizConfig.quizNumber} not found.`,
-            error: errorMessage
-        };
-      }
+			// --- 2. SINGLE SUBMISSION CHECK (USING googleapis) ---
+			// Range: Read column A (registrationCode) from row 1 down (includes header)
+			const columnRange = `${resultsSheetName}!A:A`;
 
-      await sheet.loadHeaderRow();
-      console.log(`📋 [QuizFileProcessor] Sheet headers for ${resultsSheetName}:`, sheet.headerValues);
+			const response = await sheets.spreadsheets.values.get({
+				spreadsheetId,
+				range: columnRange,
+			});
 
-      // Prepare row data
-      const rowData = {
-        registrationCode: submission.registrationCode,
-        sessionId: submission.sessionId,
-        startTime: submission.startTime,
-        endTime: submission.endTime,
-        totalTimeSeconds: submission.totalTime,
-        totalQuestions: submission.totalQuestions,
-        answeredCount: submission.answeredCount,
-        completionRate: ((submission.answeredCount / submission.totalQuestions) * 100).toFixed(2),
-        submissionTime: new Date().toISOString(),
-        answersJson: JSON.stringify(submission.answers)
-      };
+			const existingCodes = response.data.values || [];
 
-      console.log(`📝 [QuizFileProcessor] Adding submission row to ${resultsSheetName}:`, rowData);
+			let duplicateRowIndex = -1;
 
-      // Add the row
-      await sheet.addRow(rowData);
+			const isDuplicate = existingCodes.some((rowArray, index) => {
+				// index 0 is the header. We start checking data from index 1 (row 2)
+				if (index === 0) return false;
 
-      console.log(`✅ [QuizFileProcessor] Quiz ${quizConfig.quizNumber} results submitted successfully to ${resultsSheetName}`);
-      
-      return {
-        success: true,
-        message: `Quiz ${quizConfig.quizNumber} results submitted to Google Sheets`
-      };
+				const sheetCode = rowArray[0]; // Value from Column A is at index 0
+				const rowIndex = index + 1; // Actual sheet row number
 
-    } catch (error) {
-      console.error(`❌ [QuizFileProcessor] Error submitting Quiz ${quizConfig.quizNumber} results:`, error);
-      return {
-        success: false,
-        message: `Failed to submit Quiz ${quizConfig.quizNumber} results`,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
+				// Skip empty or invalid values
+				if (!sheetCode) {
+					return false;
+				}
 
-  /**
-   * Get current quiz number from environment
-   */
-  getCurrentQuizNumber(): 1 | 2 | 3 | 4 {
-    return this.currentQuizNumber;
-  }
+				const normalizedSheetCode = String(sheetCode).trim().toLowerCase();
+				const isMatch = normalizedSheetCode === incomingCode;
+
+				
+				if (isMatch) {
+					duplicateRowIndex = rowIndex;
+				}
+				return isMatch;
+			});
+
+			if (isDuplicate) {
+				const errorMessage = `Registration code '${submission.registrationCode}' has already submitted results for Quiz ${quizConfig.quizNumber}. Duplicate found in sheet row ${duplicateRowIndex}. Submission rejected.`;
+				return {
+					success: false,
+					message: 'Duplicate submission rejected.',
+					error: `Results already exist for registration code: ${submission.registrationCode}`,
+					// FIX 2: The 'code' property now exists in the SubmissionResult interface
+					code: 'DUPLICATE_ENTRY' 
+				};
+			}
+
+			// --- 3. SUBMISSION (USING google-spreadsheet) ---
+			const doc = new GoogleSpreadsheet(spreadsheetId, this.auth);
+			await doc.loadInfo();
+			let sheet = doc.sheetsByTitle[resultsSheetName];
+
+			if (!sheet) {
+				const errorMessage = `Sheet '${resultsSheetName}' not found... Submission aborted.`;
+				console.error(`❌ [QuizFileProcessor] ${errorMessage}`);
+				return { 
+                    success: false, 
+                    message: `Failed to submit quiz results: Sheet not found.`, 
+                    error: errorMessage,
+                    code: 'SHEET_NOT_FOUND' // Added specific error code
+                };
+			}
+
+			// This is necessary for addRow() to work correctly
+			await sheet.loadHeaderRow();
+
+			// Prepare row data (using descriptive headers)
+			const rowData = {
+				registrationCode: submission.registrationCode,
+				sessionId: submission.sessionId,
+				startTime: submission.startTime,
+				endTime: submission.endTime,
+				totalTimeSeconds: submission.totalTime,
+				totalQuestions: submission.totalQuestions,
+				answeredCount: submission.answeredCount,
+				completionRate: ((submission.answeredCount / submission.totalQuestions) * 100).toFixed(2),
+				submissionTime: new Date().toISOString(),
+				answersJson: JSON.stringify(submission.answers)
+			};
+
+			// Add the row
+			await sheet.addRow(rowData);
+
+			return {
+				success: true,
+				message: `Quiz ${quizConfig.quizNumber} results submitted to Google Sheets`
+			};
+
+		} catch (error) {
+			console.error(`❌ [QuizFileProcessor] Error submitting Quiz ${quizConfig.quizNumber} results:`, error);
+			return {
+				success: false,
+				message: `Failed to submit Quiz ${quizConfig.quizNumber} results`,
+				error: error instanceof Error ? error.message : 'Unknown error',
+                code: 'UNKNOWN_ERROR' // Added specific error code
+			};
+		}
+	}
+
+	getCurrentQuizNumber(): 1 | 2 | 3 | 4 {
+		return this.currentQuizNumber;
+	}
 }
 
 // Create singleton instance with environment configuration
 export const quizFileProcessor = new QuizFileProcessor({
-  serviceAccountEmail: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL || '',
-  privateKey: process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY || ''
+	serviceAccountEmail: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL || '',
+	privateKey: process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY || ''
 });
 
 // Utility function to check if Google Drive is configured
 export const isGoogleDriveConfigured = (): boolean => {
-  const isConfigured = !!(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL && process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
-   
-  console.log('🔍 [QuizFileProcessor] Google Drive configured:', isConfigured);
-  return isConfigured;
+	const isConfigured = !!(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL && process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
+	return isConfigured;
 };
 
 // Utility function to check if Google Sheets is configured
 export const isGoogleSheetsConfigured = (): boolean => {
-  const isConfigured = !!(process.env.NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL && process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
-   
-  console.log('🔍 [QuizFileProcessor] Google Sheets configured:', isConfigured);
-  return isConfigured;
+	const isConfigured = !!(process.env.NEXT_PUBLIC_GOOGLE_TEST_SHEET_ID && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_EMAIL && process.env.NEXT_PUBLIC_GOOGLE_PRIVATE_KEY);
+	return isConfigured;
 };
 
 // Utility function to get current quiz number
 export const getCurrentQuizNumber = (): 1 | 2 | 3 | 4 => {
-  return quizFileProcessor.getCurrentQuizNumber();
+	return quizFileProcessor.getCurrentQuizNumber();
 };

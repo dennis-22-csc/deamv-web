@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, ChangeEvent, useMemo } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Volume2, VolumeX, CheckCircle, XCircle } from 'lucide-react';
-import { Suspense } from 'react'; // 👈 Import Suspense
+import { Suspense } from 'react'; 
 
 // UI Components
 import { Button } from '@/components/ui/Button';
@@ -307,25 +307,44 @@ function PracticePageContent() {
 				body: JSON.stringify(payload),
 			});
 
-			// Handle the response
+            // Correctly handle non-OK responses, including 401 (Invalid API Key) and 503 (Service Unavailable)
 			if (!response.ok) {
+				// Attempt to read the error message from the JSON body
 				const errorData = await response.json().catch(() => ({ message: 'Unknown server error' }));
+				
+                // Use the message provided by the server, or fall back to status code
 				const errorMessage = errorData.message || `Server error (Status ${response.status})`;
+                
+                // Throw the error with the message to be caught below
 				throw new Error(errorMessage);
 			}
-
+            
+            // If response is OK
 			const result: EvaluationResponse = await response.json();
 			handleEvaluationResult(result);
+
 		} catch (error) {
 			console.error('Error evaluating code:', error);
+            
+            // Determine the feedback message
+            let feedbackMessage = 'Evaluation failed. Please check your internet connection and try again.';
+            if (error instanceof Error) {
+                feedbackMessage = `Evaluation failed: ${error.message}`;
+            }
+
+			// FIX: Check for the new 503 error message from the Route Handler 
+			if (feedbackMessage.includes('Service unavailable. Please wait a moment and try again.')) {
+				feedbackMessage = 'The AI service is temporarily unavailable. Please try again in a few moments.';
+			}
+
 			setState(prev => ({
 				...prev,
-				feedback: `Evaluation failed. ${error instanceof Error ? error.message : 'Please check your internet connection and try again.'}`,
+				feedback: feedbackMessage,
 				isEvaluating: false,
 				isCorrect: false,
 			}));
 			// We still log this attempt as a trial
-			logTrial(false, state.userCode, 'Evaluation failed via API call.');
+			logTrial(false, state.userCode, feedbackMessage);
 		}
 	};
 
@@ -654,17 +673,16 @@ function PracticePageContent() {
 // 2. Default Export with Suspense Boundary
 // ----------------------------------------------------------------------
 export default function PracticePage() {
-    return (
-        // Wrapping the component that uses useSearchParams() in a Suspense boundary
-        // fixes the prerendering error during the build process.
-        <Suspense fallback={
-            <div className="min-h-screen bg-gray-50">
-                <div className="max-w-6xl mx-auto px-4 py-6">
-                    <Card className="p-8 text-center">Loading application...</Card>
-                </div>
-            </div>
-        }>
-            <PracticePageContent />
-        </Suspense>
-    );
+	return (
+		// Wrapping the component that uses useSearchParams() in a Suspense boundary
+		<Suspense fallback={
+			<div className="min-h-screen bg-gray-50">
+				<div className="max-w-6xl mx-auto px-4 py-6">
+					<Card className="p-8 text-center">Loading application...</Card>
+				</div>
+			</div>
+		}>
+			<PracticePageContent />
+		</Suspense>
+	);
 }

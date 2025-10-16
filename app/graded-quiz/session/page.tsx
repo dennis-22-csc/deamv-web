@@ -23,20 +23,12 @@ export interface QuizSessionData {
   currentQuestionIndex: number;
   timeLimit: number;
   submitted?: boolean;
-  endTime?: number; // Added optional endTime to the base type
-  // ADDED: Flag to track if the questions have been shuffled to prevent re-shuffling on page refresh
+  endTime?: number; 
   shuffled?: boolean; 
 }
 
-// Derived type for a completed session, which GUARANTEES endTime is present
 export type CompletedQuizSession = Required<Pick<QuizSessionData, 'endTime'>> & QuizSessionData;
 
-// -------------------------------------
-
-/**
- * Standard Fisher-Yates shuffle algorithm.
- * @param array The array to shuffle.
- */
 const shuffleArray = <T,>(array: T[]): T[] => {
   const newArray = [...array]; // Create a copy to avoid mutating the original
   for (let i = newArray.length - 1; i > 0; i--) {
@@ -73,7 +65,7 @@ export default function GradedQuizSessionPage() {
         // 💡 SHUFFLING LOGIC
         // Only shuffle if the session is NOT marked as shuffled yet.
         if (!parsedSession.shuffled) {
-          console.log('Shuffling quiz questions...');
+          //console.log('Shuffling quiz questions...');
           const shuffledQuestions = shuffleArray(parsedSession.questions);
           
           // Recreate the session data with the new order and reset state keys 
@@ -95,7 +87,7 @@ export default function GradedQuizSessionPage() {
         setSessionData(parsedSession);
         setIsLoading(false);
       } catch (err) {
-        console.error('Error loading quiz session:', err);
+        //console.error('Error loading quiz session:', err);
         setError(err instanceof Error ? err.message : 'Failed to load quiz session');
         setIsLoading(false);
       }

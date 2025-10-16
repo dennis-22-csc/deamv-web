@@ -8,7 +8,7 @@ export interface EvaluationRequest {
   expectedSolution: string;
   language?: string;
   context?: string;
-  apiKey?: string; // Added apiKey to request
+  apiKey?: string;
 }
 
 export interface EvaluationResponse {
@@ -63,7 +63,7 @@ class GeminiAPI {
     this.config = { ...this.config, ...config };
   }
 
-  async evaluateCode(request: EvaluationRequest): Promise<EvaluationResponse> {
+  async evaluateCode(request: Omit<EvaluationRequest, 'apiKey'>): Promise<EvaluationResponse> {
     try {
       if (!this.apiKey) {
         throw new Error('API key not configured');
@@ -137,19 +137,38 @@ class GeminiAPI {
           }
         })
       });
+      
+      // 1. If it's explicitly 401 (Unauthorized), the key is bad. Return false.
+      if (response.status === 401) {
+          return false;
+      }
+      
+      // 2. If it's a temporary service error (5xx), THROW a specific error.
+      if (response.status >= 500) {
+          throw new Error(`Gemini Service Temporary Error (Status ${response.status})`);
+      }
 
+      // 3. Handle other non-OK status (e.g., 400 bad request) as a failed validation
       if (!response.ok) {
+        console.warn(`Validation request failed with status ${response.status}`);
         return false;
       }
 
+      // 4. If OK, check the content.
       const data = await response.json();
       return !!data.candidates?.[0]?.content?.parts?.[0]?.text;
     } catch (error) {
+      // Re-throw if it's the Service Temporary Error we just created
+      if (error instanceof Error && error.message.includes('Gemini Service Temporary Error')) {
+          throw error;
+      }
+      console.error('API key validation failed due to network/parsing:', error);
+      // Treat any other unexpected error (network failure, etc.) as a failed validation
       return false;
     }
   }
 
-  private buildEvaluationPrompt(request: EvaluationRequest): string {
+  private buildEvaluationPrompt(request: Omit<EvaluationRequest, 'apiKey'>): string {
     const { instruction, userCode, expectedSolution, language = 'python', context } = request;
 
     return `
@@ -291,7 +310,7 @@ Keep the explanation concise (3-5 sentences maximum) and focused on practical ap
     return await response.json();
   }
 
-  private parseEvaluationResponse(apiResponse: any, request: EvaluationRequest): EvaluationResponse {
+  private parseEvaluationResponse(apiResponse: any, request: Omit<EvaluationRequest, 'apiKey'>): EvaluationResponse {
     try {
       const text = apiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
       
@@ -497,8 +516,8 @@ Keep the explanation concise (3-5 sentences maximum) and focused on practical ap
   }
 }
 
-// Create instance (no longer a singleton that needs initialization)
-const geminiAPI = new GeminiAPI();
+// Global instance removed to prevent race condition (as fixed previously)
+// const geminiAPI = new GeminiAPI(); // REMOVED
 
 export async function POST(req: NextRequest): Promise<NextResponse<EvaluationResponse | { message: string }>> {
   try {
@@ -522,26 +541,28 @@ export async function POST(req: NextRequest): Promise<NextResponse<EvaluationRes
       );
     }
 
-    // Set the API key from the request payload
-    geminiAPI.setApiKey(apiKey);
+    // Create a new, local instance for this request
+    const api = new GeminiAPI(apiKey);
 
-    // Validate the API key
-    const isValidKey = await geminiAPI.validateApiKey(apiKey);
+    // Validate the API key using the local instance
+    // Note: The validateApiKey method now throws an error on 5xx status codes.
+    const isValidKey = await api.validateApiKey(apiKey);
+    
     if (!isValidKey) {
+      // This block is now only reached for genuine 401/Invalid Key errors
       return NextResponse.json(
-        { message: 'Invalid API key provided' },
+        { message: 'Evaluation failed: Invalid API Key provided.' }, 
         { status: 401 }
       );
     }
 
-    // Call the core evaluation logic
-    const evaluationResult: EvaluationResponse = await geminiAPI.evaluateCode({
+    // Call the core evaluation logic using the local instance
+    const evaluationResult: EvaluationResponse = await api.evaluateCode({
       instruction,
       userCode,
       expectedSolution,
       language,
       context,
-      apiKey, // Pass along the API key
     });
 
     // Return the successful evaluation response
@@ -555,16 +576,25 @@ export async function POST(req: NextRequest): Promise<NextResponse<EvaluationRes
     let status = 500;
 
     if (error instanceof Error) {
-      if (error.message.includes('API key not configured')) {
-        errorMessage = 'API Key is not configured or available.';
-        status = 500;
-      } else if (error.message.includes('UNAUTHORIZED')) {
-        errorMessage = 'Invalid API key provided.';
-        status = 401;
-      } else if (error.message.includes('RATE_LIMITED')) {
-        errorMessage = 'Rate limit exceeded. Please try again later.';
-        status = 429;
-      }
+        // CATCH THE NEWLY THROWN SERVICE ERROR (e.g., from a 503 during validation)
+        if (error.message.includes('Gemini Service Temporary Error')) {
+            errorMessage = 'Service unavailable. Please wait a moment and try again.';
+            status = 503;
+        } 
+        // Catch error messages thrown by the internal logic (e.g., API key not configured)
+        else if (error.message.includes('API key not configured')) {
+            errorMessage = 'Internal configuration error: API Key is missing for the current request.';
+            status = 500;
+        } else if (error.message.includes('UNAUTHORIZED') || error.message.includes('Invalid API key')) {
+            errorMessage = 'Invalid API key provided.';
+            status = 401;
+        } else if (error.message.includes('RATE_LIMITED')) {
+            errorMessage = 'Rate limit exceeded. Please try again later.';
+            status = 429;
+        } else {
+            errorMessage = error.message; 
+            status = 500;
+        }
     }
 
     return NextResponse.json(
@@ -574,12 +604,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<EvaluationRes
   }
 }
 
-// Convenience functions for common operations
+// Convenience functions (Keep these functions creating local instances)
 export const evaluateCodeWithGemini = async (
   instruction: string,
   userCode: string,
   expectedSolution: string,
-  apiKey: string // Now required
+  apiKey: string
 ): Promise<EvaluationResponse> => {
   const api = new GeminiAPI(apiKey);
   return api.evaluateCode({
@@ -592,7 +622,7 @@ export const evaluateCodeWithGemini = async (
 
 export const generateDataScienceChallenge = async (
   category: string,
-  apiKey: string, // Now required
+  apiKey: string,
   difficulty?: string
 ): Promise<{ instruction: string; solution: string }> => {
   const api = new GeminiAPI(apiKey);
@@ -601,7 +631,7 @@ export const generateDataScienceChallenge = async (
 
 export const explainDataScienceConcept = async (
   concept: string,
-  apiKey: string, // Now required
+  apiKey: string,
   context?: string
 ): Promise<string> => {
   const api = new GeminiAPI(apiKey);
@@ -613,7 +643,7 @@ export const validateGeminiApiKey = async (apiKey: string): Promise<boolean> => 
   return api.validateApiKey(apiKey);
 };
 
-// Mock API for development/demo purposes
+// Mock API for development/demo purposes (remains unchanged)
 export const mockEvaluateCode = async (
   instruction: string,
   userCode: string,

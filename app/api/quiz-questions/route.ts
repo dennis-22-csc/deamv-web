@@ -5,11 +5,11 @@ import { quizFileProcessor, isGoogleDriveConfigured, getCurrentQuizNumber } from
 export async function GET() {
   try {
     const quizNumber = getCurrentQuizNumber();
-    console.log(`🔍 [QuizQuestions API] Starting quiz questions download for Quiz ${quizNumber}`);
+    //console.log(`🔍 [QuizQuestions API] Starting quiz questions download for Quiz ${quizNumber}`);
     
     // Check if Google Drive is configured
     if (!isGoogleDriveConfigured()) {
-      console.error('❌ [QuizQuestions API] Google Drive not configured');
+      //console.error('❌ [QuizQuestions API] Google Drive not configured');
       return NextResponse.json(
         {
           success: false,
@@ -19,11 +19,11 @@ export async function GET() {
       );
     }
 
-    console.log(`🔍 [QuizQuestions API] Google Drive configured, attempting CSV download for Quiz ${quizNumber}`);
+    //console.log(`🔍 [QuizQuestions API] Google Drive configured, attempting CSV download for Quiz ${quizNumber}`);
     const result = await quizFileProcessor.downloadQuizQuestions();
     
     if (result.success && result.questions.length > 0) {
-      console.log(`✅ [QuizQuestions API] Successfully loaded ${result.questions.length} questions for Quiz ${quizNumber}`);
+      //console.log(`✅ [QuizQuestions API] Successfully loaded ${result.questions.length} questions for Quiz ${quizNumber}`);
       
       return NextResponse.json({
         success: true,
@@ -34,7 +34,7 @@ export async function GET() {
         timestamp: new Date().toISOString()
       });
     } else {
-      console.error(`❌ [QuizQuestions API] Quiz ${quizNumber} download failed:`, result.errors);
+      //console.error(`❌ [QuizQuestions API] Quiz ${quizNumber} download failed:`, result.errors);
       
       return NextResponse.json(
         {
@@ -51,7 +51,7 @@ export async function GET() {
     }
     
   } catch (error) {
-    console.error('❌ [QuizQuestions API] Error loading quiz questions:', error);
+    //console.error('❌ [QuizQuestions API] Error loading quiz questions:', error);
     return NextResponse.json(
       {
         success: false,

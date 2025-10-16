@@ -1,4 +1,3 @@
-// app/graded-quiz/start/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -37,9 +36,9 @@ export default function GradedQuizStartPage() {
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
-
-  // Load questions from session storage (useEffect remains the same)
+  
+  
+  // Load questions from session storage (useEffect)
   useEffect(() => {
     const loadQuestions = () => {
       try {
@@ -56,7 +55,7 @@ export default function GradedQuizStartPage() {
         setQuizData(parsedData);
         setIsLoading(false);
       } catch (err) {
-        console.error('Error loading quiz data:', err);
+        //console.error('Error loading quiz data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load quiz data');
         setIsLoading(false);
       }
@@ -66,40 +65,7 @@ export default function GradedQuizStartPage() {
   }, []);
 
 
-  // Check for prior submission based on registration code and quiz number (useEffect remains the same)
-  useEffect(() => {
-    const code = registrationCode.trim();
-
-    if (!quizData || !code) {
-      setIsAlreadySubmitted(false);
-      return;
-    }
-
-    try {
-      const storedSession = sessionStorage.getItem('gradedQuizSession');
-      if (storedSession) {
-        const parsedSession = JSON.parse(storedSession);
-        // Check for a match on registrationCode, quizNumber, and submitted: true
-        if (
-          parsedSession.registrationCode === code &&
-          parsedSession.quizNumber === quizData.quizNumber &&
-          parsedSession.submitted === true
-        ) {
-          setIsAlreadySubmitted(true);
-          // Set a specific error for the UI
-          setError(`Quiz ${quizData.quizNumber} has already been submitted for code: ${code}`);
-          return;
-        }
-      }
-      setIsAlreadySubmitted(false);
-      if (error.startsWith('Quiz')) {
-        setError(''); // Clear the 'already submitted' error if the code changes
-      }
-    } catch (e) {
-      console.error("Error checking session storage for submission status:", e);
-      setIsAlreadySubmitted(false);
-    }
-  }, [registrationCode, quizData, error]);
+  // ❌ REMOVED: The second useEffect that checked for prior submission is entirely removed.
 
 
   const handleBack = () => {
@@ -107,10 +73,7 @@ export default function GradedQuizStartPage() {
   };
 
   const handleStartQuiz = () => {
-    // Primary check: Do not proceed if already submitted
-    if (isAlreadySubmitted) {
-      return;
-    }
+    // ❌ REMOVED: Primary check for isAlreadySubmitted is gone.
 
     const code = registrationCode.trim();
 
@@ -129,7 +92,7 @@ export default function GradedQuizStartPage() {
   };
 
   const handleConfirmStart = () => {
-    if (!quizData || isAlreadySubmitted) return;
+    if (!quizData) return; // ❌ REMOVED: Check for isAlreadySubmitted is gone.
 
     const code = registrationCode.trim();
 
@@ -148,6 +111,7 @@ export default function GradedQuizStartPage() {
       submitted: false,
     };
 
+    // Store the new session, which will overwrite any previous session data for this quiz.
     sessionStorage.setItem('gradedQuizSession', JSON.stringify(quizSession));
 
     // Navigate to the actual quiz
@@ -217,7 +181,7 @@ export default function GradedQuizStartPage() {
     return null;
   }
 
-  // --- Main Start Page (Significant improvements here) ---
+  // --- Main Start Page (Updated) ---
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
@@ -292,9 +256,8 @@ export default function GradedQuizStartPage() {
                   value={registrationCode}
                   onChange={(e) => {
                     setRegistrationCode(e.target.value);
-                    if (!isAlreadySubmitted) {
-                      setError('');
-                    }
+                    // 🗹 FIXED: Removed check for isAlreadySubmitted, simply clear error on change
+                    setError('');
                   }}
                   placeholder="Enter your unique code (e.g., 89052035-191311)"
                   className="text-lg text-center font-mono py-2 focus:border-purple-500"
@@ -318,7 +281,7 @@ export default function GradedQuizStartPage() {
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-yellow-800">
-                  <strong>Important Note:</strong> This is <b>Quiz {quizData.quizNumber}</b>. Your submission will be permanently recorded under this quiz number.
+                  <strong>Important Note:</strong> This is <b>Quiz {quizData.quizNumber}</b>. Please ensure you have practiced and reviewed your notes before attempting this quiz.
                 </div>
               </div>
             </div>
@@ -327,11 +290,13 @@ export default function GradedQuizStartPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Button
                 onClick={handleStartQuiz}
-                disabled={!registrationCode.trim() || isAlreadySubmitted}
-                className={`flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto text-lg font-bold transition duration-200 ${isAlreadySubmitted ? 'bg-gray-400 hover:bg-gray-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
+                // 🗹 FIXED: Removed check for isAlreadySubmitted in disabled and classname
+                disabled={!registrationCode.trim()}
+                className={`flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto text-lg font-bold transition duration-200 bg-purple-600 hover:bg-purple-700`}
                 size="lg"
               >
-                {isAlreadySubmitted ? 'Already Submitted' : `Start Quiz ${quizData.quizNumber}`}
+                {/* 🗹 FIXED: Simplified button text */}
+                Start Quiz {quizData.quizNumber}
               </Button>
               <Button
                 variant="outline"
@@ -360,7 +325,7 @@ export default function GradedQuizStartPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Shield className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />
-                  <span className="font-semibold">All submissions are final and you can't resubmit.</span>
+                  <span className="font-semibold">All submissions are final and cannot be resubmitted.</span>
                 </li>
               </ul>
             </div>
