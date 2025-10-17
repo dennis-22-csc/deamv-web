@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Volume2, VolumeX, CheckCircle, XCircle, Play } from 'lucide-react';
-import { Suspense } from 'react'; 
+import { Suspense } from 'react'; 
 
 // UI Components
 import { Button } from '@/components/ui/Button';
@@ -442,12 +442,12 @@ function PracticePageContent() {
 				throw new Error('API key not found. Please configure your Gemini API key in settings.');
 			}
 
-			// Prepare the payload 
+			// Prepare the payload 
 			const payload: EvaluationRequest = {
 				instruction: currentChallenge.instruction,
 				userCode: state.userCode,
 				expectedSolution: currentChallenge.solution,
-				apiKey: apiKey, 
+				apiKey: apiKey, 
 			};
 
 			// Use fetch to call the Route Handler
@@ -459,35 +459,44 @@ function PracticePageContent() {
 				body: JSON.stringify(payload),
 			});
 
-            // Correctly handle non-OK responses, including 401 (Invalid API Key) and 503 (Service Unavailable)
+            // Correctly handle non-OK responses, including 401 (Invalid API Key) and others
 			if (!response.ok) {
 				// Attempt to read the error message from the JSON body
-				const errorData = await response.json().catch(() => ({ message: 'Unknown server error' }));
+				const errorData = await response.json().catch(() => ({ message: `Unknown server error (Status ${response.status})` }));
 				
-                // Use the message provided by the server, or fall back to status code
+                // The Route Handler is now designed to return a JSON object with a specific message
+                // which includes the actual Gemini API error message (e.g., for 401).
 				const errorMessage = errorData.message || `Server error (Status ${response.status})`;
-                
-                // Throw the error with the message to be caught below
+                
+                // Throw the extracted error message
 				throw new Error(errorMessage);
 			}
-            
-            // If response is OK
+            
+            // If response is OK
 			const result: EvaluationResponse = await response.json();
 			handleEvaluationResult(result);
 
 		} catch (error) {
 			console.error('Error evaluating code:', error);
-            
-            // Determine the feedback message
-            let feedbackMessage = 'Evaluation failed. Please check your internet connection and try again.';
-            if (error instanceof Error) {
-                feedbackMessage = `Evaluation failed: ${error.message}`;
-            }
-
-			// FIX: Check for the new 503 error message from the Route Handler 
-			if (feedbackMessage.includes('Service unavailable. Please wait a moment and try again.')) {
-				feedbackMessage = 'The AI service is temporarily unavailable. Please try again in a few moments.';
-			}
+            
+            // Determine the feedback message
+            let feedbackMessage = 'Evaluation failed. Please check your internet connection and try again.';
+            if (error instanceof Error) {
+                feedbackMessage = `Evaluation failed: ${error.message}`;
+                
+                // Refine messages for common errors returned by the Route Handler
+                // The route handler now sends the exact message for validation and API errors.
+                if (error.message.includes('API key not found')) {
+                    feedbackMessage = 'Evaluation failed: Gemini API key not configured. Please check your settings.';
+                } else if (error.message.includes('Invalid API key provided.') || error.message.includes('API key not valid')) {
+					// Catch both the Route's simplified message and the detailed Gemini message
+					feedbackMessage = `**API KEY ERROR:** The provided Gemini API Key is invalid or not authorized. Please check your key in settings. \n\nDetails: ${error.message}`;
+				} else if (error.message.includes('Rate limit exceeded')) {
+					feedbackMessage = `**RATE LIMIT EXCEEDED:** You have sent too many requests. Please try again later. \n\nDetails: ${error.message}`;
+				} else if (error.message.includes('Service unavailable') || error.message.includes('503')) {
+					feedbackMessage = `**SERVICE ERROR:** The Gemini AI service is temporarily unavailable. Please try again in a few moments.`;
+				}
+            }
 
 			setState(prev => ({
 				...prev,
