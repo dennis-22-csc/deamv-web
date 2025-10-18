@@ -1,4 +1,4 @@
-// app/graded-quiz/session/components/GradedQuizSession.tsx 
+// app/graded-quiz/session/components/GradedQuizSession.tsx
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -20,7 +20,7 @@ interface QuizSessionData {
   questions: QuizQuestion[];
   startTime: number;
   registrationCode: string;
-  quizNumber: 1 | 2 | 3 | 4; // ADDED: quiz number
+  quizNumber: 1 | 2 | 3 | 4;
   userAnswers: { [questionIndex: number]: string };
   currentQuestionIndex: number;
   timeLimit: number;
@@ -42,7 +42,17 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
   const [timeRemaining, setTimeRemaining] = useState(sessionData.timeLimit);
   const mainContentRef = useRef<HTMLDivElement>(null);
 
-  // Timer effect
+  // Auto-submit handler - properly memoized
+  const handleAutoSubmit = useCallback(() => {
+    console.log('🕒 Time elapsed - auto-submitting quiz...');
+    const finalSession = {
+      ...sessionData,
+      endTime: Date.now()
+    };
+    onQuizComplete(finalSession);
+  }, [sessionData, onQuizComplete]);
+
+  // Timer effect with auto-submit
   useEffect(() => {
     const elapsed = Date.now() - sessionData.startTime;
     const remaining = Math.max(0, sessionData.timeLimit - elapsed);
@@ -61,21 +71,12 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [sessionData.startTime, sessionData.timeLimit]);
+  }, [sessionData.startTime, sessionData.timeLimit, handleAutoSubmit]);
 
   // Scroll to show both header and current question when question changes
   useEffect(() => {
-    // Scroll to top to ensure header (with timer) is always visible
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [sessionData.currentQuestionIndex]);
-
-  const handleAutoSubmit = useCallback(() => {
-    const finalSession = {
-      ...sessionData,
-      endTime: Date.now()
-    };
-    onQuizComplete(finalSession);
-  }, [sessionData, onQuizComplete]);
 
   const updateAnswer = (questionIndex: number, answer: string) => {
     const updatedAnswers = {
@@ -123,7 +124,7 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
       <QuizHeader
         timeRemaining={timeRemaining}
         registrationCode={sessionData.registrationCode}
-        quizNumber={sessionData.quizNumber} // ADDED: pass quiz number
+        quizNumber={sessionData.quizNumber}
         totalQuestions={totalQuestions}
         onSubmit={handleSubmitQuiz}
       />
@@ -137,7 +138,7 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
               currentIndex={sessionData.currentQuestionIndex}
               answeredQuestions={Object.keys(sessionData.userAnswers).map(Number)}
               onQuestionSelect={navigateToQuestion}
-              quizNumber={sessionData.quizNumber} // ADDED: pass quiz number
+              quizNumber={sessionData.quizNumber}
             />
           </div>
 
@@ -172,7 +173,7 @@ export const GradedQuizSession: React.FC<GradedQuizSessionProps> = ({
         onConfirm={confirmSubmit}
         answeredCount={answeredCount}
         totalQuestions={totalQuestions}
-        quizNumber={sessionData.quizNumber} // ADDED: pass quiz number
+        quizNumber={sessionData.quizNumber}
       />
     </div>
   );

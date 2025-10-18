@@ -7,7 +7,7 @@ on:
   
   workflow_dispatch:
     inputs:
-      deployment_target: # <-- This is the input key
+      deployment_target: 
         description: 'The environment to deploy to (e.g., production, staging)'
         required: true
         default: 'production'

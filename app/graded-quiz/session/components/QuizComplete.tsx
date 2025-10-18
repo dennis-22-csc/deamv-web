@@ -1,3 +1,4 @@
+// app/graded-quiz/session/components/QuizComplete.tsx
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -28,7 +29,6 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
 
   // Calculations for summary and submission
   const totalQuestions = localSessionData.questions.length;
-  // Use sessionData.userAnswers for initial check, as it comes from the parent
   const answeredCount = Object.keys(localSessionData.userAnswers).length;
   const totalTime = Math.round((localSessionData.endTime - localSessionData.startTime) / 1000);
 
@@ -37,13 +37,13 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
     let isMounted = true;
 
     const initialSubmit = async () => {
-      // 1. **FIX: Added check for answeredCount === 0**
+      // 1. Check for zero answers
       if (answeredCount === 0) {
         if (!hasSubmittedAttempt.current) {
           console.log('🛑 Cannot auto-submit: No questions were answered.');
           setSubmitErrorDetail(NO_ANSWERS_ERROR);
           setSubmitStatus('error');
-          hasSubmittedAttempt.current = true; // Mark as attempted, but failed due to no answers
+          hasSubmittedAttempt.current = true;
         }
         return;
       }
@@ -53,7 +53,6 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
         await handleSubmitResults();
       } else {
         if (localSessionData.submitted && !hasSubmittedAttempt.current) {
-          // This case handles a session that was already submitted on a prior load
           setSubmitStatus('success');
           hasSubmittedAttempt.current = true;
         }
@@ -65,14 +64,14 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
     return () => {
       isMounted = false;
     };
-  }, [localSessionData.submitted, answeredCount]); // Depend on answeredCount for the zero-answer check
+  }, [localSessionData.submitted, answeredCount]);
 
   const handleSubmitResults = async (overrideRegistrationCode?: string) => {
     setIsSubmitting(true);
     setSubmitErrorDetail(null);
     setShowRegistrationInput(false);
 
-    // 2. **FIX: The check here is still necessary for manual submissions**
+    // Check for zero answers
     if (answeredCount === 0) {
       console.log('🛑 Submission blocked: Answered count is 0.');
       setIsSubmitting(false);
@@ -102,9 +101,6 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
         answersKeys: Object.keys(submissionData.answers),
         sessionId: submissionData.sessionId
       });
-
-      // The previous check in the old code (throw new Error('No answers...')) is replaced by the 'if (answeredCount === 0)' check above.
-      // This ensures the API call is skipped and the UI state is updated correctly.
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -243,7 +239,6 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
 
   const handleForceSubmit = () => {
     console.log('🔄 Force submission with current data');
-    // Forcing submission will re-run the `handleSubmitResults` which will re-check answeredCount
     hasSubmittedAttempt.current = false;
     handleSubmitResults();
   };
@@ -319,50 +314,40 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
           </div>
         </div>
 
-        {/* Registration Code Input for Errors - Only show when not submitting and not a zero-answer error */}
+        {/* Registration Code Input for Errors - Enhanced with resubmit button */}
         {showRegistrationInput && submitStatus === 'error' && !isZeroAnswerError && !isSubmitting && (
-          <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 p-4">
+          <div className="mb-6 rounded-lg border border-orange-300 bg-orange-50 p-4 shadow-md">
             <div className="text-left">
-              <label htmlFor="registrationCode" className="block text-sm font-semibold text-orange-700 mb-2">
-                Correct Your Registration Code <span className="text-red-500">*</span>
+              <label htmlFor="registrationCode" className="block text-sm font-semibold text-orange-800 mb-2">
+                Registration Code Required <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch">
                 <Input
                   id="registrationCode"
                   type="text"
                   value={registrationCode}
                   onChange={(e) => setRegistrationCode(e.target.value)}
                   placeholder="Enter your corrected registration code"
-                  className="text-lg text-center font-mono py-2 focus:border-orange-500 border-orange-300 pr-10"
+                  className="text-lg font-mono py-2 flex-grow focus:border-orange-500 border-orange-400"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       handleSubmitWithNewCode();
                     }
                   }}
                 />
+                <Button
+                  onClick={handleSubmitWithNewCode}
+                  className="bg-orange-600 hover:bg-orange-700 whitespace-nowrap"
+                  disabled={isSubmitting || !registrationCode.trim()}
+                >
+                  <UploadCloud className="h-4 w-4 mr-2" />
+                  {isSubmitting ? 'Submitting...' : 'Resubmit'}
+                </Button>
               </div>
-              <p className="text-orange-600 text-sm mt-2 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <span>Please correct your registration code. The previous code was not recognised by our system. Click existing code to correct it.</span>
+              <p className="text-orange-700 text-sm mt-2 flex items-start gap-2">
+                <Edit className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>Please correct your registration code and click "Resubmit"</span>
               </p>
-            </div>
-            {/* **FIX: Buttons for Registration Input Error** */}
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
-              <Button
-                onClick={handleSubmitWithNewCode}
-                className="bg-green-600 hover:bg-green-700"
-                disabled={isSubmitting || !registrationCode.trim()}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit with Corrected Code'}
-              </Button>
-              <Button
-                onClick={() => setShowRegistrationInput(false)}
-                variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
             </div>
           </div>
         )}
@@ -398,13 +383,13 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
               </p>
             )}
 
-            {/* Action Buttons for Error State (Excluding Registration Input which has its own buttons) */}
+            {/* Action Buttons for Error State */}
             {!showRegistrationInput && (
               <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
                 {isZeroAnswerError ? (
                   // If zero answers, offer to go back to quiz
                   <Button
-                    onClick={() => router.push('/graded-quiz/start')} 
+                    onClick={() => router.push('/graded-quiz/start')}
                     className="bg-red-600 hover:bg-red-700"
                     disabled={isSubmitting}
                   >
@@ -420,14 +405,12 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({ sessionData }) => {
                     {isSubmitting ? 'Retrying...' : 'Retry Submission'}
                   </Button>
                 )}
-                
-                
               </div>
             )}
           </div>
         )}
 
-        {/* Action Buttons (General) - Only show if idle or the final success/error state is not active for a full button replacement */}
+        {/* Action Buttons (General) */}
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
           {submitStatus === 'idle' && !isSubmitting && (
             <Button
