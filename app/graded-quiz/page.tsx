@@ -7,6 +7,11 @@ import { ArrowLeft, Download, AlertCircle, CheckCircle, Clock, Loader2 } from 'l
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
+// Import the new dialog component
+import { QuizUnavailableDialog } from '@/components/dialogs/QuizUnavailableDialog'; 
+
+// Import the environment variable for graded quiz status
+const GRADED_QUIZ_ENABLED = process.env.NEXT_PUBLIC_GRADED_QUIZ_ENABLED === 'true';
 
 interface QuizQuestion {
   Question: string;
@@ -22,6 +27,17 @@ export default function GradedQuizPage() {
   const [error, setError] = useState<string>('');
   const [progress, setProgress] = useState(0);
   const [quizNumber, setQuizNumber] = useState<1 | 2 | 3 | 4>(1);
+  // State for the Quiz Unavailable dialog
+  const [isQuizUnavailable, setIsQuizUnavailable] = useState(false); 
+
+  // Check quiz status when component mounts
+  useEffect(() => {
+    if (!GRADED_QUIZ_ENABLED) {
+        setIsQuizUnavailable(true);
+    } else {
+        loadQuizQuestions();
+    }
+  }, []);
 
   const loadQuizQuestions = async () => {
     setLoadingState('loading');
@@ -29,7 +45,7 @@ export default function GradedQuizPage() {
     setProgress(0);
 
     try {
-      // Simulate progress for better UX
+      // ... (rest of loadQuizQuestions logic remains the same)
       setProgress(20);
       
       // Fetch the CSV file from the server
@@ -61,6 +77,7 @@ export default function GradedQuizPage() {
     }
   };
 
+  // ... (handleStartQuiz, handleRetry, handleBack remain the same)
   const handleStartQuiz = () => {
     if (questions.length > 0) {
       // Store questions and quiz number in session storage for the quiz session
@@ -81,14 +98,31 @@ export default function GradedQuizPage() {
     router.back();
   };
 
-  // Load questions automatically when component mounts
-  useEffect(() => {
-    loadQuizQuestions();
-  }, []);
+  // If the quiz is unavailable, render only the dialog
+  if (!GRADED_QUIZ_ENABLED && isQuizUnavailable) {
+      return (
+          <QuizUnavailableDialog 
+              isOpen={isQuizUnavailable} 
+              onClose={() => router.push('/')} // Navigate home when closing
+          />
+      );
+  }
+
+  // If the quiz is enabled, but the state suggests it should be unavailable (shouldn't happen 
+  // with the new useEffect logic, but as a fallback):
+  // You might want to remove this or adjust if you want a different fallback
+  if (!GRADED_QUIZ_ENABLED) {
+    return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+            <p className="text-xl font-semibold text-gray-500">Quiz Unavailable...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
       {/* Header */}
+      {/* ... (rest of the component structure) */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -117,6 +151,7 @@ export default function GradedQuizPage() {
             </div>
 
             {/* Progress Section */}
+            {/* ... (rest of the component logic for loading/success/error states) */}
             <div className="space-y-4">
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Loading questions for Quiz {quizNumber}...</span>

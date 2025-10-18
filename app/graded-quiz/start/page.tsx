@@ -1,4 +1,4 @@
-// app/graded-quiz/start
+// app/graded-quiz/start/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,6 +8,11 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import { QuizConfirmationDialog } from '@/components/dialogs/QuizConfirmationDialog';
+import { QuizUnavailableDialog } from '@/components/dialogs/QuizUnavailableDialog'; 
+
+
+// 2. Add the Graded Quiz Enabled check
+const GRADED_QUIZ_ENABLED = process.env.NEXT_PUBLIC_GRADED_QUIZ_ENABLED === 'true';
 
 // ... (Interface and constant definitions remain the same)
 interface QuizQuestion {
@@ -37,10 +42,19 @@ export default function GradedQuizStartPage() {
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  
+  // 3. State for Quiz Unavailable Dialog
+  const [isQuizUnavailable, setIsQuizUnavailable] = useState(false);
+    
   
   // Load questions from session storage (useEffect)
   useEffect(() => {
+    // 4. Check global quiz status first
+    if (!GRADED_QUIZ_ENABLED) {
+        setIsQuizUnavailable(true);
+        setIsLoading(false); // Stop loading to render dialog
+        return; // Halt further execution
+    }
+
     const loadQuestions = () => {
       try {
         const storedQuizData = sessionStorage.getItem('gradedQuizQuestions');
@@ -66,16 +80,11 @@ export default function GradedQuizStartPage() {
   }, []);
 
 
-  // ❌ REMOVED: The second useEffect that checked for prior submission is entirely removed.
-
-
   const handleBack = () => {
     router.back();
   };
 
   const handleStartQuiz = () => {
-    // ❌ REMOVED: Primary check for isAlreadySubmitted is gone.
-
     const code = registrationCode.trim();
 
     if (!code) {
@@ -93,7 +102,7 @@ export default function GradedQuizStartPage() {
   };
 
   const handleConfirmStart = () => {
-    if (!quizData) return; // ❌ REMOVED: Check for isAlreadySubmitted is gone.
+    if (!quizData) return;
 
     const code = registrationCode.trim();
 
@@ -126,6 +135,16 @@ export default function GradedQuizStartPage() {
   const handleRetryLoad = () => {
     router.push('/graded-quiz');
   };
+
+  // 5. Early return for Quiz Disabled
+  if (isQuizUnavailable) {
+      return (
+          <QuizUnavailableDialog 
+              isOpen={true} 
+              onClose={() => router.push('/')} // Navigate home when closing
+          />
+      );
+  }
 
   // --- Loading State (No changes needed, it's already centered and clean) ---
   if (isLoading) {
