@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - master
+  
+  workflow_dispatch:
+    inputs:
+      deployment_target: # <-- This is the input key
+        description: 'The environment to deploy to (e.g., production, staging)'
+        required: true
+        default: 'production'
 
 jobs:
   deploy:
@@ -12,6 +19,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # --- NEW STEP: Determine & Log Deployment Target ---
+      - name: Determine Target & Log
+        # Use a fallback value if triggered by 'push' (where github.event.inputs is null)
+        run: |
+          TARGET="${{ github.event.inputs.deployment_target || 'master-push' }}"
+          echo "DEPLOY_TARGET=$TARGET" >> $GITHUB_ENV
+          echo "Starting deployment to target: $TARGET"
+      # --- END NEW STEP ---
 
       # 1. Setup Node.js Environment
       - name: Install Node.js
@@ -23,6 +39,7 @@ jobs:
       # 2. Build Next.js Application
       - name: Install dependencies and build Next.js app 🚀
         env:
+          # All existing secrets are preserved
           NEXT_PUBLIC_GRADED_QUIZ_ENABLED: ${{ secrets.GRADED_QUIZ_ENABLED }}
           NEXT_PUBLIC_NEW_PRACTICE_QUESTIONS_AVAILABLE: ${{ secrets.NEW_PRACTICE_QUESTIONS_AVAILABLE }}
           NEXT_PUBLIC_QUIZ_NUMBER: ${{ secrets.QUIZ_NUMBER }}
@@ -44,7 +61,7 @@ jobs:
           npm install --force
           npm run build
           
-          echo "Starting artifact packaging..."
+          echo "Starting artifact packaging for target: ${{ env.DEPLOY_TARGET }}"
           mkdir -p build_archive_temp
           
           # 2. Use rsync to copy ONLY necessary files
@@ -59,7 +76,7 @@ jobs:
           
           # 4. Clean up
           rm -rf build_archive_temp
-        
+          
       # 3. Verify files exist locally before copying
       - name: Verify deployment file locally
         run: |
@@ -80,7 +97,7 @@ jobs:
           rm: true 
 
       # 5. SSH into server & deploy
-      - name: SSH into server & deploy with backup rotation
+      - name: SSH into server & deploy (without backup)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.DO_HOST }}
@@ -88,24 +105,12 @@ jobs:
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
             set -e
-            echo "Starting Next.js deployment process..."
+            echo "Starting Next.js deployment process to target: ${{ env.DEPLOY_TARGET }}"
             
             TIMESTAMP=$(date +%Y%m%d%H%M%S)
             BASE_DIR="/var/www/deamv-web" 
             DEPLOY_DIR="$HOME/deployments"
             
-            # --- Utility Function ---
-            rotate_backups() {
-              local DIR=$1
-              if [ -d "$DIR" ]; then
-                echo "Creating backup of $DIR"
-                tar -czf "${DIR}_backup_$TIMESTAMP.tar.gz" --exclude=node_modules "$DIR"
-                ls -dt ${DIR}_backup_*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
-              else
-                echo "Directory $DIR does not exist, no backup needed"
-              fi
-            }
-
             # 6a. Verify deployment file
             echo "Checking for deployment file in $DEPLOY_DIR..."
             if [ ! -f "$DEPLOY_DIR/nextjs_build.tar.gz" ]; then
@@ -115,7 +120,6 @@ jobs:
 
             # 6b. Deploy Next.js
             echo "Deploying Next.js application..."
-            rotate_backups "${BASE_DIR}/current"
             
             TEMP_DIR="/tmp/nextjs_extract_$TIMESTAMP"
             mkdir -p "$TEMP_DIR"
@@ -142,4 +146,4 @@ jobs:
             echo "Cleaning up deployment files..."
             rm -rf "$DEPLOY_DIR/nextjs_build.tar.gz"
             
-            echo "Deployment completed successfully! Next.js application is live."
+            echo "Deployment to ${{ env.DEPLOY_TARGET }} completed successfully! Next.js application is live."
