@@ -30,7 +30,8 @@ const CLASS_OPTIONS = [
     'Class 1: Introduction to Data and Data Science', 
     'Class 2: Pandas Introduction',
     'Class 3: Pandas Deep Dive',
-    'Class 4: Data Cleaning',
+    'Class 4: Data Cleaning with Pandas',
+    'Class 5: Business Analysis with Pandas',
 ];
 
 export default function NotebookUploadPage() {
