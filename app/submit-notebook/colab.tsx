@@ -32,6 +32,7 @@ const CLASS_OPTIONS = [
     'Class 3: Pandas Deep Dive',
     'Class 4: Data Cleaning with Pandas',
     'Class 5: Business Analysis with Pandas',
+    'Class 6: Static Data Visualization with Matplotlib',
 ];
 
 export default function NotebookUploadPage() {
