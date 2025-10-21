@@ -490,7 +490,7 @@ function PracticePageContent() {
                     feedbackMessage = 'Evaluation failed: Gemini API key not configured. Please check your settings.';
                 } else if (error.message.includes('Invalid API key provided.') || error.message.includes('API key not valid')) {
 					// Catch both the Route's simplified message and the detailed Gemini message
-					feedbackMessage = `**API KEY ERROR:** The provided Gemini API Key is invalid or not authorized. Please check your key in settings. \n\nDetails: ${error.message}`;
+					feedbackMessage = `**API KEY ERROR:** The provided Gemini API Key is invalid or not authorized. Please leave the practice session and update your key in the homepage. \n\nDetails: ${error.message}`;
 				} else if (error.message.includes('Rate limit exceeded')) {
 					feedbackMessage = `**RATE LIMIT EXCEEDED:** You have sent too many requests. Please try again later. \n\nDetails: ${error.message}`;
 				} else if (error.message.includes('Service unavailable') || error.message.includes('503')) {
